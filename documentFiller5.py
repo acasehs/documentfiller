@@ -23,6 +23,8 @@ from datetime import datetime
 import shutil
 import hashlib
 from typing import Dict, List, Tuple
+import sqlite3
+import uuid
 
 # dependency pips:  python -m pip install --break-system-packages cryptography textstat nltk tiktoken scikit-learn numpy requests
 
@@ -215,6 +217,14 @@ class DocxDocumentFiller:
         self.selected_section = None
         self.generated_content = ""
         self.last_sent_prompt = ""
+
+        # External RAG content storage
+        self.external_content_db = None
+        self.init_external_content_db()
+
+        # Section chat storage
+        self.section_chat_history = {}  # {section_hash: [(role, message), ...]}
+        self.current_chat_section = None
         
         # Document review configuration
         self.review_mode_active = False
@@ -303,7 +313,32 @@ class DocxDocumentFiller:
             
         except Exception as e:
             print(f"Dark theme configuration failed: {e}")
-            
+
+    def init_external_content_db(self):
+        """Initialize SQLite database for external RAG content"""
+        try:
+            db_path = os.path.join(os.path.expanduser("~"), ".documentfiller_external_rag.db")
+            self.external_content_db = sqlite3.connect(db_path, check_same_thread=False)
+            cursor = self.external_content_db.cursor()
+
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS external_content (
+                    id TEXT PRIMARY KEY,
+                    title TEXT NOT NULL,
+                    content TEXT NOT NULL,
+                    category TEXT,
+                    tags TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+
+            self.external_content_db.commit()
+            print("✓ External RAG content database initialized")
+        except Exception as e:
+            print(f"⚠ External content DB init failed: {e}")
+            self.external_content_db = None
+
     def set_default_prompt(self):
         """Set default master prompt"""
         default = """You are a Department of Defense cybersecurity expert tasked with creating comprehensive, technically accurate documentation for a DoD system.
@@ -1330,12 +1365,20 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
         self.apply_suggestions_btn.pack(fill=tk.X, pady=(0, 10))
         
         # Regenerate from review button - NEW
-        self.regenerate_from_review_btn = ttk.Button(button_frame, text="🔄 Regenerate from Review", 
+        self.regenerate_from_review_btn = ttk.Button(button_frame, text="🔄 Regenerate from Review",
                                                     command=self.regenerate_from_review,
                                                     state='disabled')
         self.regenerate_from_review_btn.pack(fill=tk.X, pady=(0, 10))
-        
-        ttk.Button(button_frame, text="🚀 Auto Complete Document", 
+
+        # NEW: External RAG Content Manager
+        ttk.Button(button_frame, text="📎 External RAG Content",
+                command=self.open_external_content_manager).pack(fill=tk.X, pady=(0, 10))
+
+        # NEW: Whole Document Review
+        ttk.Button(button_frame, text="📋 Review Entire Document",
+                command=self.review_whole_document).pack(fill=tk.X, pady=(0, 10))
+
+        ttk.Button(button_frame, text="🚀 Auto Complete Document",
                 command=self.auto_complete_document).pack(fill=tk.X, pady=(0, 10))
         
         ttk.Button(button_frame, text="Edit Master Prompt", 
@@ -1365,7 +1408,10 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
         
         # NEW: Prompt History tab
         self.create_prompt_history_tab()
-        
+
+        # NEW: Section Chat tab
+        self.create_section_chat_tab()
+
         # Console tab
         self.create_console_tab()
         
@@ -2970,7 +3016,21 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
             if self.selected_knowledge_collections:
                 collection_names = [col['name'] for col in self.selected_knowledge_collections]
                 prompt += f"\n\nIMPORTANT: Reference knowledge base: {', '.join(collection_names)}"
-            
+
+            # NEW: Add external RAG content if available
+            external_content = self.get_external_rag_content()
+            if external_content:
+                prompt += "\n\n" + "="*60 + "\n"
+                prompt += "ADDITIONAL REFERENCE CONTENT (External RAG):\n"
+                prompt += "="*60 + "\n"
+                for title, content, category, tags in external_content[:10]:  # Limit to top 10 for token management
+                    prompt += f"\n[{title}]"
+                    if category:
+                        prompt += f" (Category: {category})"
+                    prompt += f"\n{content}\n"
+                    prompt += "-"*40 + "\n"
+                self.log_message(f"✓ Included {len(external_content[:10])} external RAG items")
+
             # Store the prompt
             self.last_sent_prompt = prompt
             
@@ -6684,6 +6744,613 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
             
         except Exception as e:
             messagebox.showerror("Error", f"Failed to analyze strategy: {str(e)}")
+
+    # ============================================================================
+    # NEW FEATURES: External RAG Content, Section Chat, Whole Document Review
+    # ============================================================================
+
+    def get_external_rag_content(self):
+        """Retrieve all external RAG content for inclusion in queries"""
+        if not self.external_content_db:
+            return []
+
+        try:
+            cursor = self.external_content_db.cursor()
+            cursor.execute("SELECT title, content, category, tags FROM external_content ORDER BY updated_at DESC")
+            return cursor.fetchall()
+        except Exception as e:
+            self.log_message(f"Error retrieving external content: {e}")
+            return []
+
+    def open_external_content_manager(self):
+        """Open dialog to manage external RAG content"""
+        dialog = tk.Toplevel(self.root)
+        dialog.title("External RAG Content Manager")
+        dialog.geometry("900x700")
+        dialog.configure(bg="#2b2b2b")
+        dialog.grab_set()
+
+        main_frame = ttk.Frame(dialog, padding="20")
+        main_frame.pack(fill=tk.BOTH, expand=True)
+        main_frame.columnconfigure(0, weight=1)
+        main_frame.rowconfigure(1, weight=1)
+
+        # Title
+        ttk.Label(main_frame, text="External RAG Content Manager",
+                font=("Arial", 12, "bold")).grid(row=0, column=0, sticky=tk.W, pady=(0, 15))
+
+        # Content list
+        list_frame = ttk.LabelFrame(main_frame, text="Content Library", padding="10")
+        list_frame.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), pady=(0, 10))
+        list_frame.columnconfigure(0, weight=1)
+        list_frame.rowconfigure(0, weight=1)
+
+        # Create treeview for content list
+        columns = ("title", "category", "tags", "created")
+        content_tree = ttk.Treeview(list_frame, columns=columns, show="headings", height=15)
+        content_tree.heading("title", text="Title")
+        content_tree.heading("category", text="Category")
+        content_tree.heading("tags", text="Tags")
+        content_tree.heading("created", text="Created")
+        content_tree.column("title", width=300)
+        content_tree.column("category", width=150)
+        content_tree.column("tags", width=200)
+        content_tree.column("created", width=150)
+
+        scrollbar = ttk.Scrollbar(list_frame, orient=tk.VERTICAL, command=content_tree.yview)
+        content_tree.configure(yscrollcommand=scrollbar.set)
+
+        content_tree.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        scrollbar.grid(row=0, column=1, sticky=(tk.N, tk.S))
+
+        # Button frame
+        btn_frame = ttk.Frame(main_frame)
+        btn_frame.grid(row=2, column=0, sticky=tk.E, pady=(10, 0))
+
+        def refresh_content_list():
+            """Refresh the content list"""
+            content_tree.delete(*content_tree.get_children())
+            if self.external_content_db:
+                try:
+                    cursor = self.external_content_db.cursor()
+                    cursor.execute("SELECT id, title, category, tags, created_at FROM external_content ORDER BY updated_at DESC")
+                    for row in cursor.fetchall():
+                        content_id, title, category, tags, created = row
+                        content_tree.insert("", tk.END, values=(title, category or "", tags or "", created[:16] if created else ""))
+                        content_tree.set(content_tree.get_children()[-1], "#0", content_id)
+                except Exception as e:
+                    messagebox.showerror("Error", f"Failed to load content: {e}")
+
+        def add_content():
+            """Add new external content"""
+            add_dialog = tk.Toplevel(dialog)
+            add_dialog.title("Add External Content")
+            add_dialog.geometry("700x600")
+            add_dialog.configure(bg="#2b2b2b")
+            add_dialog.grab_set()
+
+            add_frame = ttk.Frame(add_dialog, padding="20")
+            add_frame.pack(fill=tk.BOTH, expand=True)
+
+            ttk.Label(add_frame, text="Add External RAG Content", font=("Arial", 12, "bold")).pack(anchor=tk.W, pady=(0, 15))
+
+            # Title
+            ttk.Label(add_frame, text="Title:").pack(anchor=tk.W)
+            title_entry = ttk.Entry(add_frame, width=60)
+            title_entry.pack(fill=tk.X, pady=(0, 10))
+
+            # Category
+            ttk.Label(add_frame, text="Category (optional):").pack(anchor=tk.W)
+            category_entry = ttk.Entry(add_frame, width=60)
+            category_entry.pack(fill=tk.X, pady=(0, 10))
+
+            # Tags
+            ttk.Label(add_frame, text="Tags (comma-separated, optional):").pack(anchor=tk.W)
+            tags_entry = ttk.Entry(add_frame, width=60)
+            tags_entry.pack(fill=tk.X, pady=(0, 10))
+
+            # Content
+            ttk.Label(add_frame, text="Content:").pack(anchor=tk.W)
+            content_text = scrolledtext.ScrolledText(add_frame, width=60, height=15, bg='#1e1e1e', fg='#ffffff', insertbackground='#ffffff')
+            content_text.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
+
+            def save_content():
+                title = title_entry.get().strip()
+                content = content_text.get('1.0', tk.END).strip()
+
+                if not title or not content:
+                    messagebox.showwarning("Validation", "Title and content are required")
+                    return
+
+                try:
+                    content_id = str(uuid.uuid4())
+                    cursor = self.external_content_db.cursor()
+                    cursor.execute("""
+                        INSERT INTO external_content (id, title, content, category, tags)
+                        VALUES (?, ?, ?, ?, ?)
+                    """, (content_id, title, content, category_entry.get().strip(), tags_entry.get().strip()))
+                    self.external_content_db.commit()
+                    self.log_message(f"✓ Added external content: {title}")
+                    messagebox.showinfo("Success", "Content added successfully")
+                    refresh_content_list()
+                    add_dialog.destroy()
+                except Exception as e:
+                    messagebox.showerror("Error", f"Failed to save content: {e}")
+
+            def load_from_file():
+                """Load content from a file"""
+                file_path = filedialog.askopenfilename(
+                    title="Select File",
+                    filetypes=[("Text files", "*.txt"), ("Markdown", "*.md"), ("All files", "*.*")]
+                )
+                if file_path:
+                    try:
+                        with open(file_path, 'r', encoding='utf-8') as f:
+                            content_text.delete('1.0', tk.END)
+                            content_text.insert('1.0', f.read())
+                        if not title_entry.get():
+                            title_entry.insert(0, os.path.basename(file_path))
+                    except Exception as e:
+                        messagebox.showerror("Error", f"Failed to load file: {e}")
+
+            save_btn_frame = ttk.Frame(add_frame)
+            save_btn_frame.pack(fill=tk.X)
+
+            ttk.Button(save_btn_frame, text="Load from File", command=load_from_file).pack(side=tk.LEFT)
+            ttk.Button(save_btn_frame, text="Cancel", command=add_dialog.destroy).pack(side=tk.RIGHT)
+            ttk.Button(save_btn_frame, text="Save", command=save_content).pack(side=tk.RIGHT, padx=(0, 5))
+
+        def delete_content():
+            """Delete selected content"""
+            selected = content_tree.selection()
+            if not selected:
+                messagebox.showwarning("No Selection", "Please select content to delete")
+                return
+
+            if messagebox.askyesno("Confirm Delete", "Delete selected content?"):
+                try:
+                    for item in selected:
+                        content_id = content_tree.set(item, "#0")
+                        cursor = self.external_content_db.cursor()
+                        cursor.execute("DELETE FROM external_content WHERE id = ?", (content_id,))
+                    self.external_content_db.commit()
+                    refresh_content_list()
+                    self.log_message("✓ Content deleted")
+                except Exception as e:
+                    messagebox.showerror("Error", f"Failed to delete content: {e}")
+
+        def view_content():
+            """View selected content"""
+            selected = content_tree.selection()
+            if not selected:
+                messagebox.showwarning("No Selection", "Please select content to view")
+                return
+
+            try:
+                content_id = content_tree.set(selected[0], "#0")
+                cursor = self.external_content_db.cursor()
+                cursor.execute("SELECT title, content, category, tags FROM external_content WHERE id = ?", (content_id,))
+                row = cursor.fetchone()
+
+                if row:
+                    view_dialog = tk.Toplevel(dialog)
+                    view_dialog.title(f"View: {row[0]}")
+                    view_dialog.geometry("700x500")
+                    view_dialog.configure(bg="#2b2b2b")
+
+                    view_frame = ttk.Frame(view_dialog, padding="20")
+                    view_frame.pack(fill=tk.BOTH, expand=True)
+
+                    ttk.Label(view_frame, text=f"Title: {row[0]}", font=("Arial", 10, "bold")).pack(anchor=tk.W)
+                    if row[2]:
+                        ttk.Label(view_frame, text=f"Category: {row[2]}").pack(anchor=tk.W)
+                    if row[3]:
+                        ttk.Label(view_frame, text=f"Tags: {row[3]}").pack(anchor=tk.W)
+                    ttk.Label(view_frame, text="Content:", font=("Arial", 10, "bold")).pack(anchor=tk.W, pady=(10, 5))
+
+                    content_display = scrolledtext.ScrolledText(view_frame, width=60, height=20, bg='#1e1e1e', fg='#ffffff', wrap=tk.WORD)
+                    content_display.pack(fill=tk.BOTH, expand=True)
+                    content_display.insert('1.0', row[1])
+                    content_display.config(state=tk.DISABLED)
+
+                    ttk.Button(view_frame, text="Close", command=view_dialog.destroy).pack(pady=(10, 0))
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to view content: {e}")
+
+        ttk.Button(btn_frame, text="Add Content", command=add_content).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(btn_frame, text="View", command=view_content).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(btn_frame, text="Delete", command=delete_content).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(btn_frame, text="Refresh", command=refresh_content_list).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(btn_frame, text="Close", command=dialog.destroy).pack(side=tk.RIGHT)
+
+        # Initial load
+        refresh_content_list()
+
+        # Show count
+        count = len(content_tree.get_children())
+        self.log_message(f"External RAG content manager opened ({count} items)")
+
+    def create_section_chat_tab(self):
+        """Create the Section Chat tab for iterative refinement"""
+        chat_frame = ttk.Frame(self.notebook, padding="10")
+        self.notebook.add(chat_frame, text="Section Chat")
+
+        chat_frame.columnconfigure(0, weight=1)
+        chat_frame.rowconfigure(1, weight=1)
+
+        # Info label
+        info_frame = ttk.Frame(chat_frame)
+        info_frame.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=(0, 10))
+
+        self.chat_section_label = tk.StringVar(value="No section selected for chat")
+        ttk.Label(info_frame, textvariable=self.chat_section_label, font=("Arial", 10, "bold")).pack(side=tk.LEFT)
+
+        ttk.Button(info_frame, text="Start Chat with Selected Section",
+                command=self.start_section_chat).pack(side=tk.RIGHT)
+        ttk.Button(info_frame, text="Clear Chat",
+                command=self.clear_section_chat).pack(side=tk.RIGHT, padx=(0, 5))
+
+        # Chat history display
+        history_frame = ttk.LabelFrame(chat_frame, text="Conversation", padding="10")
+        history_frame.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), pady=(0, 10))
+        history_frame.columnconfigure(0, weight=1)
+        history_frame.rowconfigure(0, weight=1)
+
+        self.chat_history_text = scrolledtext.ScrolledText(history_frame, width=80, height=20,
+                                                          bg='#1e1e1e', fg='#ffffff',
+                                                          insertbackground='#ffffff', wrap=tk.WORD)
+        self.chat_history_text.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        self.chat_history_text.config(state=tk.DISABLED)
+
+        # Message input
+        input_frame = ttk.LabelFrame(chat_frame, text="Your Message", padding="10")
+        input_frame.grid(row=2, column=0, sticky=(tk.W, tk.E), pady=(0, 10))
+        input_frame.columnconfigure(0, weight=1)
+
+        self.chat_input_text = scrolledtext.ScrolledText(input_frame, width=80, height=5,
+                                                        bg='#1e1e1e', fg='#ffffff',
+                                                        insertbackground='#ffffff', wrap=tk.WORD)
+        self.chat_input_text.grid(row=0, column=0, sticky=(tk.W, tk.E))
+
+        # Buttons
+        btn_frame = ttk.Frame(chat_frame)
+        btn_frame.grid(row=3, column=0, sticky=tk.E)
+
+        self.chat_send_btn = ttk.Button(btn_frame, text="Send Message", command=self.send_chat_message, state=tk.DISABLED)
+        self.chat_send_btn.pack(side=tk.LEFT, padx=(0, 5))
+
+        self.chat_apply_btn = ttk.Button(btn_frame, text="Apply Last Response to Section",
+                                        command=self.apply_chat_to_section, state=tk.DISABLED)
+        self.chat_apply_btn.pack(side=tk.LEFT)
+
+    def start_section_chat(self):
+        """Start a chat session with the selected section"""
+        if not self.selected_section:
+            messagebox.showwarning("No Selection", "Please select a section first")
+            return
+
+        if not self.selected_model.get():
+            messagebox.showwarning("No Model", "Please configure a model first")
+            return
+
+        self.current_chat_section = self.selected_section
+        section_hash = self.selected_section.get_section_hash()
+
+        # Initialize chat history for this section if needed
+        if section_hash not in self.section_chat_history:
+            self.section_chat_history[section_hash] = []
+
+        # Update UI
+        self.chat_section_label.set(f"Chatting about: {self.selected_section.get_full_path()}")
+        self.chat_send_btn.config(state=tk.NORMAL)
+
+        # Display chat history
+        self.refresh_chat_display()
+
+        # Add initial context message if this is a new chat
+        if len(self.section_chat_history[section_hash]) == 0:
+            context_msg = f"Started chat for section: {self.selected_section.get_full_path()}\n"
+            if self.selected_section.has_content():
+                context_msg += f"\nExisting content:\n{self.selected_section.get_existing_content()}\n"
+            else:
+                context_msg += "\n(Section currently has no content)\n"
+
+            self.chat_history_text.config(state=tk.NORMAL)
+            self.chat_history_text.insert(tk.END, f"{'='*60}\n{context_msg}{'='*60}\n\n")
+            self.chat_history_text.config(state=tk.DISABLED)
+
+        self.log_message(f"Started chat for section: {self.selected_section.get_full_path()}")
+        self.notebook.select(3)  # Switch to chat tab
+
+    def clear_section_chat(self):
+        """Clear the current section chat"""
+        if not self.current_chat_section:
+            return
+
+        if messagebox.askyesno("Clear Chat", "Clear the chat history for this section?"):
+            section_hash = self.current_chat_section.get_section_hash()
+            self.section_chat_history[section_hash] = []
+            self.refresh_chat_display()
+            self.chat_apply_btn.config(state=tk.DISABLED)
+            self.log_message("Chat history cleared")
+
+    def refresh_chat_display(self):
+        """Refresh the chat history display"""
+        if not self.current_chat_section:
+            return
+
+        section_hash = self.current_chat_section.get_section_hash()
+        history = self.section_chat_history.get(section_hash, [])
+
+        self.chat_history_text.config(state=tk.NORMAL)
+        self.chat_history_text.delete('1.0', tk.END)
+
+        for role, message in history:
+            if role == "user":
+                self.chat_history_text.insert(tk.END, f"YOU:\n{message}\n\n", "user")
+            else:
+                self.chat_history_text.insert(tk.END, f"AI:\n{message}\n\n", "assistant")
+                self.chat_history_text.insert(tk.END, "-" * 60 + "\n\n")
+
+        self.chat_history_text.tag_config("user", foreground="#4CAF50", font=("Arial", 10, "bold"))
+        self.chat_history_text.tag_config("assistant", foreground="#2196F3", font=("Arial", 10, "bold"))
+
+        self.chat_history_text.config(state=tk.DISABLED)
+        self.chat_history_text.see(tk.END)
+
+    def send_chat_message(self):
+        """Send a message in the section chat"""
+        if not self.current_chat_section:
+            messagebox.showwarning("No Chat", "Please start a chat session first")
+            return
+
+        user_message = self.chat_input_text.get('1.0', tk.END).strip()
+        if not user_message:
+            messagebox.showwarning("Empty Message", "Please enter a message")
+            return
+
+        # Disable send button during processing
+        self.chat_send_btn.config(state=tk.DISABLED)
+        self.chat_input_text.delete('1.0', tk.END)
+
+        # Run in thread
+        thread = threading.Thread(target=self.process_chat_message, args=(user_message,))
+        thread.daemon = True
+        thread.start()
+
+    def process_chat_message(self, user_message):
+        """Process chat message in background thread"""
+        try:
+            section_hash = self.current_chat_section.get_section_hash()
+
+            # Add user message to history
+            self.section_chat_history[section_hash].append(("user", user_message))
+            self.root.after(0, self.refresh_chat_display)
+
+            # Build context for AI
+            section = self.current_chat_section
+            context = f"""You are helping refine content for a document section.
+
+Section: {section.get_full_path()}
+
+Current content:
+{section.get_existing_content() if section.has_content() else "(No content yet)"}
+
+Previous conversation:
+"""
+            # Include last 4 messages for context
+            history = self.section_chat_history[section_hash]
+            for role, msg in history[-5:-1]:  # Exclude the current user message
+                context += f"\n{role.upper()}: {msg}\n"
+
+            context += f"\nUser's current question/request: {user_message}\n\n"
+            context += "Respond helpfully. If the user asks you to write or modify content, provide the complete updated content in your response."
+
+            # Query AI
+            self.log_message("Sending chat message to AI...")
+            response = self.query_openwebui(context)
+
+            if response and not response.startswith("Error:"):
+                # Add AI response to history
+                self.section_chat_history[section_hash].append(("assistant", response))
+                self.root.after(0, self.refresh_chat_display)
+                self.root.after(0, lambda: self.chat_apply_btn.config(state=tk.NORMAL))
+                self.log_message("AI response received")
+            else:
+                self.log_message(f"Chat error: {response}")
+                messagebox.showerror("Error", f"Failed to get response: {response}")
+
+        except Exception as e:
+            self.log_message(f"Chat error: {str(e)}")
+            self.root.after(0, lambda: messagebox.showerror("Error", f"Chat failed: {str(e)}"))
+        finally:
+            self.root.after(0, lambda: self.chat_send_btn.config(state=tk.NORMAL))
+
+    def apply_chat_to_section(self):
+        """Apply the last AI response to the current section"""
+        if not self.current_chat_section:
+            messagebox.showwarning("No Chat", "No active chat session")
+            return
+
+        section_hash = self.current_chat_section.get_section_hash()
+        history = self.section_chat_history.get(section_hash, [])
+
+        if not history or history[-1][0] != "assistant":
+            messagebox.showwarning("No Response", "No AI response to apply")
+            return
+
+        # Get the last AI response
+        last_response = history[-1][1]
+
+        # Set it as generated content
+        self.generated_content = last_response
+
+        # Show it in preview
+        self.root.after(0, self.show_generated_content)
+
+        # Enable commit
+        self.commit_btn.config(state=tk.NORMAL)
+
+        self.log_message("Applied chat response to section - ready to commit")
+        messagebox.showinfo("Applied", "Chat response applied to section. Review in Preview tab and click Commit when ready.")
+
+    def review_whole_document(self):
+        """Review the entire document for cohesion, clarity, etc."""
+        if not self.document:
+            messagebox.showwarning("No Document", "Please load a document first")
+            return
+
+        if not self.selected_model.get():
+            messagebox.showwarning("No Model", "Please configure a model first")
+            return
+
+        if not self.sections:
+            messagebox.showwarning("No Sections", "Document has no sections to review")
+            return
+
+        # Confirm action
+        section_count = len([s for s in self.sections if s.has_content()])
+        if not messagebox.askyesno("Confirm Review",
+                                  f"Review entire document?\n\n"
+                                  f"This will analyze {section_count} sections with content.\n"
+                                  f"This may take several minutes."):
+            return
+
+        self.log_message("Starting whole document review...")
+        self.notebook.select(4)  # Switch to console
+
+        # Run in thread
+        thread = threading.Thread(target=self.perform_whole_document_review)
+        thread.daemon = True
+        thread.start()
+
+    def perform_whole_document_review(self):
+        """Perform whole document review in background thread"""
+        try:
+            # Collect all sections with content
+            sections_with_content = [s for s in self.sections if s.has_content()]
+
+            if not sections_with_content:
+                self.root.after(0, lambda: messagebox.showinfo("No Content", "No sections have content to review"))
+                return
+
+            # Build comprehensive document content
+            full_document = ""
+            for section in sections_with_content:
+                full_document += f"\n\n{'='*60}\n"
+                full_document += f"SECTION: {section.get_full_path()}\n"
+                full_document += f"{'='*60}\n\n"
+                full_document += section.get_existing_content()
+
+            # Build review prompt
+            review_prompt = """You are an expert technical writer reviewing a complete document for quality, cohesion, and clarity.
+
+REVIEW THE ENTIRE DOCUMENT BELOW and provide a comprehensive analysis.
+
+Evaluate:
+1. **Overall Cohesion** (1-10): Does the document flow logically? Are sections well-connected?
+2. **Clarity** (1-10): Is the writing clear and understandable throughout?
+3. **Technical Accuracy** (1-10): Are technical details accurate and appropriate?
+4. **Completeness** (1-10): Does the document cover all necessary topics comprehensively?
+5. **Consistency** (1-10): Is terminology, style, and tone consistent across sections?
+
+For each criterion:
+- Provide a score (1-10)
+- List specific issues or concerns
+- Provide recommendations for improvement
+
+Also identify:
+- Sections that are particularly strong
+- Sections that need significant improvement
+- Any gaps or missing information
+- Any redundancy or unnecessary repetition
+- Transitions that could be improved
+
+DOCUMENT TO REVIEW:
+""" + full_document
+
+            self.log_message("Sending document to AI for comprehensive review...")
+
+            # Query AI
+            response = self.query_openwebui(review_prompt)
+
+            if response and not response.startswith("Error:"):
+                # Display results
+                self.root.after(0, lambda: self.show_document_review_results(response, sections_with_content))
+                self.log_message("✓ Whole document review completed")
+            else:
+                self.log_message(f"Review failed: {response}")
+                self.root.after(0, lambda: messagebox.showerror("Error", f"Review failed: {response}"))
+
+        except Exception as e:
+            self.log_message(f"Review error: {str(e)}")
+            self.root.after(0, lambda: messagebox.showerror("Error", f"Review failed: {str(e)}"))
+
+    def show_document_review_results(self, review_content, sections):
+        """Display whole document review results"""
+        # Create results dialog
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Whole Document Review Results")
+        dialog.geometry("1000x800")
+        dialog.configure(bg="#2b2b2b")
+
+        main_frame = ttk.Frame(dialog, padding="20")
+        main_frame.pack(fill=tk.BOTH, expand=True)
+        main_frame.columnconfigure(0, weight=1)
+        main_frame.rowconfigure(1, weight=1)
+
+        # Header
+        header_frame = ttk.Frame(main_frame)
+        header_frame.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=(0, 15))
+
+        ttk.Label(header_frame, text="Document Review Results",
+                font=("Arial", 14, "bold")).pack(side=tk.LEFT)
+        ttk.Label(header_frame, text=f"Reviewed {len(sections)} sections",
+                font=("Arial", 10)).pack(side=tk.LEFT, padx=(20, 0))
+
+        # Results display
+        results_frame = ttk.LabelFrame(main_frame, text="Review Analysis", padding="10")
+        results_frame.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        results_frame.columnconfigure(0, weight=1)
+        results_frame.rowconfigure(0, weight=1)
+
+        results_text = scrolledtext.ScrolledText(results_frame, width=100, height=35,
+                                                bg='#1e1e1e', fg='#ffffff',
+                                                insertbackground='#ffffff', wrap=tk.WORD)
+        results_text.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+
+        # Insert content
+        results_text.insert('1.0', f"{'='*80}\n")
+        results_text.insert(tk.END, f"WHOLE DOCUMENT REVIEW\n")
+        results_text.insert(tk.END, f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+        results_text.insert(tk.END, f"Sections Analyzed: {len(sections)}\n")
+        results_text.insert(tk.END, f"{'='*80}\n\n")
+        results_text.insert(tk.END, review_content)
+
+        results_text.config(state=tk.DISABLED)
+
+        # Buttons
+        btn_frame = ttk.Frame(main_frame)
+        btn_frame.grid(row=2, column=0, sticky=tk.E, pady=(10, 0))
+
+        def export_review():
+            """Export review to file"""
+            file_path = filedialog.asksaveasfilename(
+                defaultextension=".txt",
+                filetypes=[("Text files", "*.txt"), ("Markdown", "*.md"), ("All files", "*.*")]
+            )
+            if file_path:
+                try:
+                    with open(file_path, 'w', encoding='utf-8') as f:
+                        f.write(results_text.get('1.0', tk.END))
+                    messagebox.showinfo("Success", f"Review exported to:\n{file_path}")
+                except Exception as e:
+                    messagebox.showerror("Error", f"Failed to export: {e}")
+
+        ttk.Button(btn_frame, text="Export Review", command=export_review).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(btn_frame, text="Close", command=dialog.destroy).pack(side=tk.LEFT)
+
+        self.log_message("Review results displayed")
 
 
 if __name__ == "__main__":
