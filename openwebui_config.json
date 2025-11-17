@@ -1,7 +1,7 @@
 {
   "base_url": "http://172.16.27.122:3000",
   "api_key": "sk-d15bcb8898d5453ebc9799985215653f",
-  "model": "llama4:latest",
+  "model": "gemma3:12b",
   "temperature": 0.07,
   "max_tokens": 80000,
   "knowledge_collections": [
