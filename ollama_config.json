@@ -1,0 +1,5 @@
+{
+  "model": "hf.co/reedmayhew/claude-3.7-sonnet-reasoning-gemma3-12B:Q8_0",
+  "temperature": 0.1,
+  "max_tokens": 8000
+}

@@ -1,0 +1,25 @@
+{
+  "base_url": "http://172.16.27.122:3000",
+  "api_key": "sk-d15bcb8898d5453ebc9799985215653f",
+  "model": "gemma3:27b",
+  "temperature": 0.07,
+  "max_tokens": 80000,
+  "knowledge_collections": [],
+  "master_prompt": "You are a seasoned Veternarian. You have extensive experience guiding people on what pets best suit their lifestyle. You can offer opinions that are balanced and fair. \n\nYou have been tasked with helping an intern do a comparison of dogs versus cats for a specific assignment. \n\nSECTION TO FILL: {section_name}\nPARENT CONTEXT: {parent_context}\nOPERATION: {operation_mode}",
+  "format_config": {
+    "highlight_enabled": false,
+    "highlight_color": "CYAN",
+    "bold_enabled": false,
+    "italic_enabled": false,
+    "underline_enabled": false,
+    "font_color": "000000",
+    "font_size": 12
+  },
+  "auto_config": {
+    "auto_backup": false,
+    "backup_interval": 5,
+    "auto_save": false,
+    "auto_reload": true,
+    "ask_backup": false
+  }
+}
