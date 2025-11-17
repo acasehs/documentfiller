@@ -267,22 +267,55 @@ class DocxDocumentFiller:
         
         # Operation mode
         self.operation_mode = tk.StringVar(value="replace")
-        
+
         # Default master prompt
         self.master_prompt = tk.StringVar()
         self.set_default_prompt()
-        
+
+        # Initialize credential manager if available
+        self.credential_manager = None
+        self.content_processor = None
+        self.advanced_reviewer = None
+
+        if ENHANCED_FEATURES_AVAILABLE['encryption'] and CredentialManager:
+            try:
+                self.credential_manager = CredentialManager()
+                print("✓ Credential manager initialized")
+            except Exception as e:
+                print(f"⚠ Credential manager init failed: {e}")
+
         # Load settings
         self.load_settings()
-        
+
         # Create GUI
         self.create_gui()
         self.setup_text_widgets_colors()
-        
+
+        # Initialize advanced modules after settings are loaded
+        if ENHANCED_FEATURES_AVAILABLE['intelligent_processing'] and IntelligentContentProcessor:
+            try:
+                self.content_processor = IntelligentContentProcessor()
+                print("✓ Intelligent content processor initialized")
+            except Exception as e:
+                print(f"⚠ Content processor init failed: {e}")
+
+        if ENHANCED_FEATURES_AVAILABLE['advanced_review'] and TechnicalDocumentReviewer:
+            try:
+                reviewer_config = {
+                    'base_url': self.openwebui_base_url,
+                    'api_key': self.openwebui_api_key,
+                    'review_model': self.selected_model.get() or 'llama3.1:latest',
+                    'comment_model': self.selected_model.get() or 'llama3.1:latest'
+                }
+                self.advanced_reviewer = TechnicalDocumentReviewer(reviewer_config)
+                print("✓ Advanced document reviewer initialized")
+            except Exception as e:
+                print(f"⚠ Advanced reviewer init failed: {e}")
+
         # Load last document if available
         if self.last_document_path and os.path.exists(self.last_document_path):
             self.load_document(self.last_document_path)
-        
+
         # Start auto-backup timer if enabled
         if self.auto_config['auto_backup'].get():
             self.schedule_auto_backup()
@@ -1253,45 +1286,58 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
         title_frame = ttk.Frame(main_container)
         title_frame.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=(0, 10))
         title_frame.columnconfigure(0, weight=1)
-        
-        ttk.Label(title_frame, text="Document Content Generator - OpenWebUI", 
+
+        ttk.Label(title_frame, text="Document Content Generator - OpenWebUI",
                 font=("Arial", 16, "bold")).pack(side=tk.LEFT)
-        
+
         # Configuration buttons on title row
         btn_container = ttk.Frame(title_frame)
         btn_container.pack(side=tk.RIGHT)
 
-        ttk.Button(btn_container, text="⚙ Config Files", 
-                command=self.open_config_file_manager).pack(side=tk.LEFT, padx=2)
-        ttk.Button(btn_container, text="⚙ Formatting", 
-                command=self.open_formatting_dialog).pack(side=tk.LEFT, padx=2)
-        ttk.Button(btn_container, text="🔄 Auto Features", 
-                command=self.open_auto_features_dialog).pack(side=tk.LEFT, padx=2)
+        # Reduce button padding and add more buttons to top row
+        btn_style = {'padx': 1, 'pady': 2, 'side': tk.LEFT}
+
+        ttk.Button(btn_container, text="⚙ Config Files",
+                command=self.open_config_file_manager).pack(**btn_style)
+        ttk.Button(btn_container, text="⚙ Formatting",
+                command=self.open_formatting_dialog).pack(**btn_style)
+        ttk.Button(btn_container, text="🔄 Auto",
+                command=self.open_auto_features_dialog).pack(**btn_style)
+        ttk.Button(btn_container, text="📎 External RAG",
+                command=self.open_external_content_manager).pack(**btn_style)
+        ttk.Button(btn_container, text="✏️ Master Prompt",
+                command=self.edit_master_prompt).pack(**btn_style)
+        ttk.Button(btn_container, text="📚 Prompts",
+                command=self.open_prompt_library).pack(**btn_style)
+        ttk.Button(btn_container, text="🔐 Credentials",
+                command=self.manage_encrypted_credentials_dialog).pack(**btn_style)
         
-        # Top controls
+        # Top controls - Side-by-side layout with reduced padding
         top_frame = ttk.Frame(main_container)
-        top_frame.grid(row=1, column=0, sticky=(tk.W, tk.E), pady=(0, 10))
+        top_frame.grid(row=1, column=0, sticky=(tk.W, tk.E), pady=(0, 5))
+        top_frame.columnconfigure(0, weight=1)
         top_frame.columnconfigure(1, weight=1)
-        
-        # Document selection
-        doc_frame = ttk.LabelFrame(top_frame, text="Document", padding="10")
-        doc_frame.grid(row=0, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 10))
-        doc_frame.columnconfigure(2, weight=1)  # Make column 2 (label) expandable
-        
-        ttk.Button(doc_frame, text="Load Document", command=self.browse_document).grid(row=0, column=0, padx=(0, 5))
-        
+
+        # Document selection - Left side with reduced padding
+        doc_frame = ttk.LabelFrame(top_frame, text="Document", padding="5")
+        doc_frame.grid(row=0, column=0, sticky=(tk.W, tk.E), padx=(0, 5))
+        doc_frame.columnconfigure(2, weight=1)
+
+        ttk.Button(doc_frame, text="Load", command=self.browse_document).grid(row=0, column=0, padx=(0, 3))
+
         # Reload button - initially disabled until document is loaded
-        self.reload_btn = ttk.Button(doc_frame, text="Reload Document", command=self.reload_document_wrapper, state=tk.DISABLED)
-        self.reload_btn.grid(row=0, column=1, padx=(0, 5))
-        
+        self.reload_btn = ttk.Button(doc_frame, text="Reload", command=self.reload_document_wrapper, state=tk.DISABLED)
+        self.reload_btn.grid(row=0, column=1, padx=(0, 3))
+
         self.doc_label_var = tk.StringVar(value="No document loaded")
-        ttk.Label(doc_frame, textvariable=self.doc_label_var).grid(row=0, column=2, sticky=tk.W, padx=5)
-        
-        # OpenWebUI configuration (AI only)
-        config_frame = ttk.LabelFrame(top_frame, text="OpenWebUI Configuration", padding="10")
-        config_frame.grid(row=1, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 10))
-        
-        ttk.Button(config_frame, text="Configure AI Settings", command=self.open_config_dialog).grid(row=0, column=0, padx=(0, 10))
+        ttk.Label(doc_frame, textvariable=self.doc_label_var).grid(row=0, column=2, sticky=tk.W, padx=3)
+
+        # OpenWebUI configuration - Right side with reduced padding
+        config_frame = ttk.LabelFrame(top_frame, text="OpenWebUI", padding="5")
+        config_frame.grid(row=0, column=1, sticky=(tk.W, tk.E))
+        config_frame.columnconfigure(1, weight=1)
+
+        ttk.Button(config_frame, text="Configure AI", command=self.open_config_dialog).grid(row=0, column=0, padx=(0, 5))
         self.config_status_var = tk.StringVar(value="Not configured")
         ttk.Label(config_frame, textvariable=self.config_status_var).grid(row=0, column=1, sticky=tk.W)
         
@@ -1308,24 +1354,24 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
         left_panel.columnconfigure(0, weight=1)
         left_panel.rowconfigure(1, weight=1)
         
-        # Section tree
-        tree_frame = ttk.LabelFrame(left_panel, text="Document Sections", padding="5")
-        tree_frame.grid(row=0, column=0, rowspan=2, sticky=(tk.W, tk.E, tk.N, tk.S), pady=(0, 10))
+        # Section tree - Reduced padding
+        tree_frame = ttk.LabelFrame(left_panel, text="Document Sections", padding="3")
+        tree_frame.grid(row=0, column=0, rowspan=2, sticky=(tk.W, tk.E, tk.N, tk.S), pady=(0, 5))
         tree_frame.columnconfigure(0, weight=1)
         tree_frame.rowconfigure(0, weight=1)
-        
+
         self.tree = ttk.Treeview(tree_frame, selectmode='browse')
         tree_scroll = ttk.Scrollbar(tree_frame, orient="vertical", command=self.tree.yview)
         self.tree.configure(yscrollcommand=tree_scroll.set)
-        
+
         self.tree.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         tree_scroll.grid(row=0, column=1, sticky=(tk.N, tk.S))
-        
+
         self.tree.bind('<<TreeviewSelect>>', self.on_section_select)
-        
-        # Operation controls
-        op_frame = ttk.LabelFrame(left_panel, text="Operation Mode", padding="10")
-        op_frame.grid(row=2, column=0, sticky=(tk.W, tk.E), pady=(0, 10))
+
+        # Operation controls - Reduced padding
+        op_frame = ttk.LabelFrame(left_panel, text="Operation Mode", padding="5")
+        op_frame.grid(row=2, column=0, sticky=(tk.W, tk.E), pady=(0, 5))
         
         ttk.Radiobutton(op_frame, text="Replace (write from scratch)", 
                     variable=self.operation_mode, value="replace").pack(anchor=tk.W)
@@ -1334,58 +1380,48 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
         ttk.Radiobutton(op_frame, text="Append (add to existing)", 
                     variable=self.operation_mode, value="append").pack(anchor=tk.W)
         
-        # Action buttons
+        # Action buttons - Reduced padding
         button_frame = ttk.Frame(left_panel)
         button_frame.grid(row=3, column=0, sticky=(tk.W, tk.E))
-        
-        self.generate_btn = ttk.Button(button_frame, text="Generate Content", 
+
+        # Reduced padding for all buttons
+        btn_pady = (0, 5)
+
+        self.generate_btn = ttk.Button(button_frame, text="Generate Content",
                                     command=self.generate_content, state='disabled')
-        self.generate_btn.pack(fill=tk.X, pady=(0, 10))
-        
-        # Review button - NEW
-        self.review_btn = ttk.Button(button_frame, text="📝 Review Section", 
+        self.generate_btn.pack(fill=tk.X, pady=btn_pady)
+
+        # Review button
+        self.review_btn = ttk.Button(button_frame, text="📝 Review Section",
                                     command=self.conduct_section_review, state='disabled')
-        self.review_btn.pack(fill=tk.X, pady=(0, 10))
-        
-        self.tense_btn = ttk.Button(button_frame, text="🎯 Analyze Tenses", command=self.analyze_document_tenses, state='disabled')
-        self.tense_btn.pack(fill=tk.X, pady=(0, 10))
+        self.review_btn.pack(fill=tk.X, pady=btn_pady)
 
-        # Processing Strategy button (NEW)
-        ttk.Button(button_frame, text="🧠 Processing Strategy", command=self.show_processing_strategy_dialog).pack(fill=tk.X, pady=(0, 10))
+        self.tense_btn = ttk.Button(button_frame, text="🎯 Analyze Tenses",
+                                    command=self.analyze_document_tenses, state='disabled')
+        self.tense_btn.pack(fill=tk.X, pady=btn_pady)
 
-        # Credential Security button (NEW)
-        ttk.Button(button_frame, text="🔐 Credential Security", command=self.manage_encrypted_credentials_dialog).pack(fill=tk.X, pady=(0, 10))
+        # Processing Strategy button
+        ttk.Button(button_frame, text="🧠 Processing Strategy",
+                command=self.show_processing_strategy_dialog).pack(fill=tk.X, pady=btn_pady)
 
-
-
-        # Apply review suggestions button - NEW
-        self.apply_suggestions_btn = ttk.Button(button_frame, text="✅ Apply Review Suggestions", 
+        # Apply review suggestions button
+        self.apply_suggestions_btn = ttk.Button(button_frame, text="✅ Apply Suggestions",
                                             command=self.apply_review_suggestions,
                                             state='disabled')
-        self.apply_suggestions_btn.pack(fill=tk.X, pady=(0, 10))
-        
-        # Regenerate from review button - NEW
-        self.regenerate_from_review_btn = ttk.Button(button_frame, text="🔄 Regenerate from Review",
+        self.apply_suggestions_btn.pack(fill=tk.X, pady=btn_pady)
+
+        # Regenerate from review button
+        self.regenerate_from_review_btn = ttk.Button(button_frame, text="🔄 Regenerate Review",
                                                     command=self.regenerate_from_review,
                                                     state='disabled')
-        self.regenerate_from_review_btn.pack(fill=tk.X, pady=(0, 10))
+        self.regenerate_from_review_btn.pack(fill=tk.X, pady=btn_pady)
 
-        # NEW: External RAG Content Manager
-        ttk.Button(button_frame, text="📎 External RAG Content",
-                command=self.open_external_content_manager).pack(fill=tk.X, pady=(0, 10))
+        # Whole Document Review
+        ttk.Button(button_frame, text="📋 Review Document",
+                command=self.review_whole_document).pack(fill=tk.X, pady=btn_pady)
 
-        # NEW: Whole Document Review
-        ttk.Button(button_frame, text="📋 Review Entire Document",
-                command=self.review_whole_document).pack(fill=tk.X, pady=(0, 10))
-
-        ttk.Button(button_frame, text="🚀 Auto Complete Document",
-                command=self.auto_complete_document).pack(fill=tk.X, pady=(0, 10))
-        
-        ttk.Button(button_frame, text="Edit Master Prompt", 
-                command=self.edit_master_prompt).pack(fill=tk.X, pady=(0, 10))
-        
-        ttk.Button(button_frame, text="📚 Prompt Library", 
-        command=self.open_prompt_library).pack(fill=tk.X, pady=(0, 10))
+        ttk.Button(button_frame, text="🚀 Auto Complete",
+                command=self.auto_complete_document).pack(fill=tk.X, pady=btn_pady)
         
         # Right panel
         right_panel = ttk.Frame(content_frame)
