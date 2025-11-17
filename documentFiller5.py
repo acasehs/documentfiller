@@ -6328,7 +6328,20 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
                         pady=5,
                         cursor="hand2")
             btn3.pack(fill=tk.X, pady=3)
-            
+
+            # Load from file button
+            btn_load = tk.Button(action_frame,
+                        text="📂 Load Credentials from File",
+                        command=lambda: self.load_from_encrypted_credentials(),
+                        bg="#404040",
+                        fg="#ffffff",
+                        font=("Arial", 10),
+                        relief=tk.RAISED,
+                        padx=10,
+                        pady=5,
+                        cursor="hand2")
+            btn_load.pack(fill=tk.X, pady=3)
+
             if not self.credential_manager.is_encrypted:
                 btn4 = tk.Button(action_frame,
                             text="🔒 Enable Encryption",
@@ -6690,7 +6703,58 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
         except Exception as e:
             self.log_message(f"Error saving encrypted credentials: {e}")
             messagebox.showerror("Error", f"Failed to save: {str(e)}")
-        
+
+        return False
+
+    def load_from_encrypted_credentials(self):
+        """Load credentials from a specific file"""
+        if not self.credential_manager:
+            messagebox.showinfo("Not Available", "Credential manager not available")
+            return False
+
+        # Prompt for file selection
+        from tkinter import filedialog
+        filepath = filedialog.askopenfilename(
+            title="Select Credentials File",
+            filetypes=[
+                ("Encrypted Credentials", "*.enc"),
+                ("JSON Files", "*.json"),
+                ("All Files", "*.*")
+            ],
+            initialdir=os.path.dirname(os.path.abspath(__file__))
+        )
+
+        if not filepath:
+            self.log_message("Load credentials cancelled")
+            return False
+
+        try:
+            # Load credentials from the selected file
+            if self.credential_manager.load_credentials_from_file(filepath, self.root):
+                # Apply loaded credentials to current settings
+                creds = self.credential_manager.get_all_credentials()
+
+                if 'openwebui' in creds:
+                    self.openwebui_base_url = creds['openwebui'].get('base_url', self.openwebui_base_url)
+                    self.openwebui_api_key = creds['openwebui'].get('api_key', '')
+                    self.selected_model.set(creds['openwebui'].get('default_model', ''))
+                    self.temperature.set(creds['openwebui'].get('temperature', 0.1))
+                    self.max_tokens.set(creds['openwebui'].get('max_tokens', 8000))
+
+                # Update UI
+                self.update_config_status()
+
+                self.log_message(f"✓ Credentials loaded from: {os.path.basename(filepath)}")
+                messagebox.showinfo("Success",
+                    f"Credentials loaded successfully!\n\n" +
+                    f"From: {os.path.basename(filepath)}\n\n" +
+                    "Settings have been applied.")
+                return True
+
+        except Exception as e:
+            self.log_message(f"Error loading credentials: {e}")
+            messagebox.showerror("Error", f"Failed to load credentials: {str(e)}")
+
         return False
 
     def analyze_document_tenses(self):
