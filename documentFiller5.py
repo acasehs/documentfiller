@@ -1354,82 +1354,97 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
     def setup_text_widgets_colors(self):
         """Enhanced text widget styling with additional markdown support"""
         try:
+            # List of all text widgets that need white cursor on dark background
+            dark_text_widgets = [
+                self.generated_text,
+                self.existing_text,
+                self.prompt_text,
+                self.console
+            ]
+
+            # Apply white cursor to all dark text widgets
+            for widget in dark_text_widgets:
+                if widget:
+                    widget.config(insertbackground='#ffffff')  # White cursor
+                    widget.config(selectbackground='#3a5f8f')  # Blue selection
+                    widget.config(selectforeground='#ffffff')  # White selection text
+
             # Configure existing tags
             self.generated_text.tag_configure('bold', font=('TkDefaultFont', 10, 'bold'))
             self.generated_text.tag_configure('italic', font=('TkDefaultFont', 10, 'italic'))
-            self.generated_text.tag_configure('code', 
+            self.generated_text.tag_configure('code',
                                             font=('Consolas', 9),
                                             background='#f0f0f0',
                                             foreground='#008000')
-            
+
             # Add new enhanced tags
-            self.generated_text.tag_configure('highlight', 
+            self.generated_text.tag_configure('highlight',
                                             background='#ffff00',
                                             foreground='#000000')
-            
-            self.generated_text.tag_configure('strike', 
+
+            self.generated_text.tag_configure('strike',
                                             overstrike=True,
                                             foreground='#808080')
-            
-            self.generated_text.tag_configure('quote', 
+
+            self.generated_text.tag_configure('quote',
                                             font=('TkDefaultFont', 10, 'italic'),
                                             foreground='#606060',
                                             lmargin1=20,
                                             lmargin2=20)
-            
-            self.generated_text.tag_configure('hr', 
+
+            self.generated_text.tag_configure('hr',
                                             foreground='#808080',
                                             justify='center')
-            
-            self.generated_text.tag_configure('code_lang', 
+
+            self.generated_text.tag_configure('code_lang',
                                             font=('TkDefaultFont', 8),
                                             foreground='#808080')
-            
+
             # Table styling
-            self.generated_text.tag_configure('table_header', 
+            self.generated_text.tag_configure('table_header',
                                             font=('TkDefaultFont', 10, 'bold'),
                                             foreground='#000080')
-            
-            self.generated_text.tag_configure('table_sep', 
+
+            self.generated_text.tag_configure('table_sep',
                                             foreground='#808080')
-            
-            self.generated_text.tag_configure('table_row', 
+
+            self.generated_text.tag_configure('table_row',
                                             font=('Consolas', 9),
                                             foreground='#404040')
-            
+
             # Apply dark theme colors if using dark theme
             if hasattr(self, 'is_dark_theme') and self.is_dark_theme:
                 self.generated_text.configure(bg='#1e1e1e', fg='#ffffff', insertbackground='#ffffff')
-                
+
                 # Adjust colors for dark theme
-                self.generated_text.tag_configure('code', 
+                self.generated_text.tag_configure('code',
                                                 background='#2d2d2d',
                                                 foreground='#90ee90')
-                
-                self.generated_text.tag_configure('quote', 
+
+                self.generated_text.tag_configure('quote',
                                                 foreground='#c0c0c0')
-                
-                self.generated_text.tag_configure('table_header', 
+
+                self.generated_text.tag_configure('table_header',
                                                 foreground='#87ceeb')
-                
-                self.generated_text.tag_configure('table_row', 
+
+                self.generated_text.tag_configure('table_row',
                                                 foreground='#d0d0d0')
-                
-                self.generated_text.tag_configure('hr', 
+
+                self.generated_text.tag_configure('hr',
                                                 foreground='#c0c0c0')
-                
-                self.generated_text.tag_configure('code_lang', 
+
+                self.generated_text.tag_configure('code_lang',
                                                 foreground='#c0c0c0')
-            
+
             # Configure prompt text widget
             if hasattr(self, 'prompt_text'):
                 self.prompt_text.tag_configure('bold', font=('TkDefaultFont', 10, 'bold'))
                 self.prompt_text.tag_configure('italic', font=('TkDefaultFont', 10, 'italic'))
-                self.prompt_text.tag_configure('code', 
+                self.prompt_text.tag_configure('code',
                                             font=('Consolas', 9),
                                             background='#f0f0f0' if not hasattr(self, 'is_dark_theme') or not self.is_dark_theme else '#2d2d2d',
                                             foreground='#008000' if not hasattr(self, 'is_dark_theme') or not self.is_dark_theme else '#90ee90')
-                
+
         except Exception as e:
             print(f"Error setting up enhanced text widget colors: {e}")
 
@@ -3076,51 +3091,51 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
         library_window.geometry("900x600")
         library_window.configure(bg="#2b2b2b")
         library_window.grab_set()
-        
+
         main_frame = ttk.Frame(library_window, padding="20")
         main_frame.pack(fill=tk.BOTH, expand=True)
-        
-        ttk.Label(main_frame, text="Prompt Library Manager", 
+
+        ttk.Label(main_frame, text="Prompt Library Manager",
                 font=("Arial", 14, "bold")).pack(anchor=tk.W, pady=(0, 15))
-        
+
         # Create split view
         pane = ttk.PanedWindow(main_frame, orient=tk.HORIZONTAL)
         pane.pack(fill=tk.BOTH, expand=True, pady=(0, 15))
-        
+
         # Left panel - list of saved prompts
-        left_frame = ttk.Frame(pane)
-        pane.add(left_frame, weight=1)
-        
+        left_frame = ttk.Frame(pane, width=300)  # Set explicit width
+        pane.add(left_frame, weight=0)  # Don't resize with window
+
         ttk.Label(left_frame, text="Saved Prompts:").pack(anchor=tk.W, pady=(0, 5))
-        
+
         # Prompt list with scrollbar
         list_frame = ttk.Frame(left_frame)
         list_frame.pack(fill=tk.BOTH, expand=True)
-        
+
         list_scrollbar = ttk.Scrollbar(list_frame)
         list_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        
+
         prompt_list = tk.Listbox(list_frame, yscrollcommand=list_scrollbar.set,
                                 bg="#1e1e1e", fg="#ffffff", font=("Consolas", 10),
-                                width=30)  # Added width parameter to prevent collapsing
+                                width=35)  # Increased width to prevent collapse
         prompt_list.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         list_scrollbar.config(command=prompt_list.yview)
-        
+
         # Buttons for list operations
         list_btn_frame = ttk.Frame(left_frame)
         list_btn_frame.pack(fill=tk.X, pady=(5, 0))
-        
-        ttk.Button(list_btn_frame, text="Import", 
+
+        ttk.Button(list_btn_frame, text="Import",
                 command=lambda: self.import_prompt_to_library(prompt_list, prompt_preview)).pack(side=tk.LEFT, padx=(0, 5))
-        ttk.Button(list_btn_frame, text="Remove", 
+        ttk.Button(list_btn_frame, text="Remove",
                 command=lambda: self.remove_prompt_from_library(prompt_list, prompt_preview)).pack(side=tk.LEFT)
-        
+
         # Right panel - prompt preview
         right_frame = ttk.Frame(pane)
-        pane.add(right_frame, weight=2)
-        
+        pane.add(right_frame, weight=3)  # Takes up remaining space
+
         ttk.Label(right_frame, text="Prompt Preview:").pack(anchor=tk.W, pady=(0, 5))
-        
+
         prompt_preview = scrolledtext.ScrolledText(right_frame, height=20,
                                                 bg="#1e1e1e", fg="#ffffff",
                                                 font=("Consolas", 10), wrap=tk.WORD)
@@ -3129,31 +3144,32 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
         prompt_preview.config(insertbackground="#ffffff")  # White cursor
         prompt_preview.config(selectbackground="#3a5f8f")  # Blue selection background
         prompt_preview.config(selectforeground="#ffffff")  # White selection text
-        
+
         # Buttons for preview operations
         preview_btn_frame = ttk.Frame(right_frame)
         preview_btn_frame.pack(fill=tk.X)
-        
-        ttk.Button(preview_btn_frame, text="Use This Prompt", 
+
+        ttk.Button(preview_btn_frame, text="Use This Prompt",
                 command=lambda: self.use_selected_prompt(prompt_list, prompt_preview, library_window)).pack(side=tk.RIGHT)
-        
+
         # Bottom buttons
         bottom_frame = ttk.Frame(main_frame)
         bottom_frame.pack(fill=tk.X, pady=(0, 5))
-        
-        ttk.Button(bottom_frame, text="Close", 
+
+        ttk.Button(bottom_frame, text="Close",
                 command=library_window.destroy).pack(side=tk.RIGHT)
-        
+
         # Load saved prompts from library
         self.load_prompt_library(prompt_list, prompt_preview)
-        
+
         # Bind selection event
-        prompt_list.bind('<<ListboxSelect>>', 
+        prompt_list.bind('<<ListboxSelect>>',
                         lambda e: self.on_prompt_select(e, prompt_list, prompt_preview))
-        
-        # Ensure the window is properly sized
+
+        # Ensure the window is properly sized and sash is positioned correctly
         library_window.update_idletasks()
-        pane.sashpos(0, 300)
+        # Set sash position after window is fully rendered
+        library_window.after(100, lambda: pane.sashpos(0, 300))
 
     def edit_master_prompt(self):
         """Open master prompt editor"""
