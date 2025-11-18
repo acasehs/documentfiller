@@ -49,3 +49,5 @@ Thumbs.db
 *.pem
 config_credentials.enc
 openwebui_config.json
+config_credentials.enc
+*.enc
