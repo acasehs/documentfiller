@@ -13,13 +13,30 @@ import requests  # pip install requests
 from typing import Dict, List, Tuple, Optional, Union
 from datetime import datetime, timedelta
 from dataclasses import dataclass
-import tiktoken  # pip install tiktoken
-from sklearn.feature_extraction.text import TfidfVectorizer  # pip install scikit-learn
-from sklearn.metrics.pairwise import cosine_similarity
-import numpy as np  # pip install numpy
 import pickle
 import threading
 import time
+
+# Optional dependencies with graceful degradation
+try:
+    import tiktoken  # pip install tiktoken
+    HAS_TIKTOKEN = True
+except ImportError:
+    print("⚠ tiktoken not available - using character-based estimation")
+    HAS_TIKTOKEN = False
+    tiktoken = None
+
+try:
+    from sklearn.feature_extraction.text import TfidfVectorizer  # pip install scikit-learn
+    from sklearn.metrics.pairwise import cosine_similarity
+    import numpy as np  # pip install numpy
+    HAS_SKLEARN = True
+except ImportError:
+    print("⚠ scikit-learn/numpy not available - using basic similarity")
+    HAS_SKLEARN = False
+    TfidfVectorizer = None
+    cosine_similarity = None
+    np = None
 
 @dataclass
 class DocumentChunk:
@@ -57,31 +74,37 @@ class ContentMetrics:
 
 class IntelligentContentProcessor:
     """Handles intelligent content processing strategy selection"""
-    
-    def __init__(self, config: Dict):
-        self.config = config
-        self.rag_threshold = config.get('rag_threshold', 10000)  # characters
-        self.max_prompt_tokens = config.get('max_prompt_tokens', 8000)
-        self.chunk_size = config.get('chunk_size', 1000)  # characters
-        self.chunk_overlap = config.get('chunk_overlap', 100)  # characters
-        
+
+    def __init__(self, config: Dict = None):
+        self.config = config or {}
+        self.rag_threshold = self.config.get('rag_threshold', 10000)  # characters
+        self.max_prompt_tokens = self.config.get('max_prompt_tokens', 8000)
+        self.chunk_size = self.config.get('chunk_size', 1000)  # characters
+        self.chunk_overlap = self.config.get('chunk_overlap', 100)  # characters
+
         # Initialize tokenizer (OpenAI's tiktoken for consistent token counting)
-        try:
-            self.tokenizer = tiktoken.get_encoding("cl100k_base")
-        except:
+        if HAS_TIKTOKEN:
+            try:
+                self.tokenizer = tiktoken.get_encoding("cl100k_base")
+            except:
+                self.tokenizer = None
+        else:
             self.tokenizer = None
-        
+
         # Initialize document store (SQLite for simplicity)
-        self.db_path = config.get('document_store_path', 'document_store.db')
+        self.db_path = self.config.get('document_store_path', 'document_store.db')
         self.init_document_store()
-        
+
         # TF-IDF for content similarity (lightweight alternative to embeddings)
-        self.vectorizer = TfidfVectorizer(
-            max_features=1000,
-            stop_words='english',
-            ngram_range=(1, 2)
-        )
-        
+        if HAS_SKLEARN:
+            self.vectorizer = TfidfVectorizer(
+                max_features=1000,
+                stop_words='english',
+                ngram_range=(1, 2)
+            )
+        else:
+            self.vectorizer = None
+
         # Cache for processed documents
         self.content_cache = {}
         self.cache_ttl = timedelta(hours=1)

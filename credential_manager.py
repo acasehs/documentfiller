@@ -112,7 +112,9 @@ class CredentialManager:
                 "api_key": "",
                 "default_model": "",
                 "temperature": 0.1,
-                "max_tokens": 8000
+                "max_tokens": 8000,
+                "knowledge_collections": [],  # Store selected knowledge collections
+                "last_used": None  # Timestamp of last use
             },
             "document_review": {
                 "review_model": "llama3.1:latest",
@@ -124,7 +126,8 @@ class CredentialManager:
                 "rag_threshold": 10000,  # chars - above this use RAG, below use full prompt
                 "auto_tense_correction": False,
                 "backup_encrypted": True
-            }
+            },
+            "last_credential_file": None  # Track which credential file was last used
         }
     
     def _prompt_for_new_password(self, parent_window):
