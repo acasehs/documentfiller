@@ -11,26 +11,55 @@ import requests  # pip install requests
 from datetime import datetime
 from typing import Dict, List, Tuple, Optional
 from dataclasses import dataclass
-import tkinter as tk
-from tkinter import messagebox, simpledialog
-from textstat import flesch_reading_ease, flesch_kincaid_grade  # pip install textstat
-import nltk  # pip install nltk
-from nltk.tokenize import sent_tokenize, word_tokenize
-from nltk.tag import pos_tag
-from nltk.corpus import stopwords
 
-# Download required NLTK data (run once)
+# Optional dependencies with graceful degradation
 try:
-    nltk.data.find('tokenizers/punkt')
-    nltk.data.find('averaged_perceptron_tagger')
-    nltk.data.find('corpora/stopwords')
-except LookupError:
+    import tkinter as tk
+    from tkinter import messagebox, simpledialog
+    HAS_TKINTER = True
+except ImportError:
+    print("⚠ tkinter not available - UI features disabled")
+    HAS_TKINTER = False
+    tk = None
+    messagebox = None
+    simpledialog = None
+
+try:
+    from textstat import flesch_reading_ease, flesch_kincaid_grade  # pip install textstat
+    HAS_TEXTSTAT = True
+except ImportError:
+    print("⚠ textstat not available - readability metrics disabled")
+    HAS_TEXTSTAT = False
+    flesch_reading_ease = None
+    flesch_kincaid_grade = None
+
+try:
+    import nltk  # pip install nltk
+    from nltk.tokenize import sent_tokenize, word_tokenize
+    from nltk.tag import pos_tag
+    from nltk.corpus import stopwords
+    HAS_NLTK = True
+
+    # Download required NLTK data (run once)
     try:
-        nltk.download('punkt')
-        nltk.download('averaged_perceptron_tagger') 
-        nltk.download('stopwords')
-    except:
-        pass
+        nltk.data.find('tokenizers/punkt')
+        nltk.data.find('averaged_perceptron_tagger')
+        nltk.data.find('corpora/stopwords')
+    except LookupError:
+        try:
+            nltk.download('punkt', quiet=True)
+            nltk.download('averaged_perceptron_tagger', quiet=True)
+            nltk.download('stopwords', quiet=True)
+        except:
+            pass
+except ImportError:
+    print("⚠ nltk not available - linguistic analysis disabled")
+    HAS_NLTK = False
+    nltk = None
+    sent_tokenize = None
+    word_tokenize = None
+    pos_tag = None
+    stopwords = None
 
 @dataclass
 class TenseAnalysis:

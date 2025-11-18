@@ -292,25 +292,48 @@ class DocxDocumentFiller:
         self.setup_text_widgets_colors()
 
         # Initialize advanced modules after settings are loaded
+        self.update_status("Initializing advanced modules...")
+
         if ENHANCED_FEATURES_AVAILABLE['intelligent_processing'] and IntelligentContentProcessor:
             try:
-                self.content_processor = IntelligentContentProcessor()
+                # Build config for content processor with RAG settings
+                processor_config = {
+                    'rag_threshold': 10000,  # characters
+                    'max_prompt_tokens': self.max_tokens.get(),
+                    'chunk_size': 1000,
+                    'chunk_overlap': 100,
+                    'document_store_path': os.path.join(
+                        os.path.dirname(os.path.abspath(__file__)),
+                        'document_store.db'
+                    ),
+                    'base_url': self.openwebui_base_url,
+                    'api_key': self.openwebui_api_key,
+                    'selected_collections': self.selected_knowledge_collections
+                }
+                self.content_processor = IntelligentContentProcessor(processor_config)
                 print("✓ Intelligent content processor initialized")
             except Exception as e:
                 print(f"⚠ Content processor init failed: {e}")
+                self.content_processor = None
 
         if ENHANCED_FEATURES_AVAILABLE['advanced_review'] and TechnicalDocumentReviewer:
             try:
+                # Build config for document reviewer with collections
                 reviewer_config = {
                     'base_url': self.openwebui_base_url,
                     'api_key': self.openwebui_api_key,
                     'review_model': self.selected_model.get() or 'llama3.1:latest',
-                    'comment_model': self.selected_model.get() or 'llama3.1:latest'
+                    'comment_model': self.selected_model.get() or 'llama3.1:latest',
+                    'selected_collections': self.selected_knowledge_collections
                 }
                 self.advanced_reviewer = TechnicalDocumentReviewer(reviewer_config)
                 print("✓ Advanced document reviewer initialized")
             except Exception as e:
                 print(f"⚠ Advanced reviewer init failed: {e}")
+                self.advanced_reviewer = None
+
+        # Display enabled features
+        self.display_enabled_features()
 
         # Load last document if available
         if self.last_document_path and os.path.exists(self.last_document_path):
@@ -319,6 +342,59 @@ class DocxDocumentFiller:
         # Start auto-backup timer if enabled
         if self.auto_config['auto_backup'].get():
             self.schedule_auto_backup()
+
+    def display_enabled_features(self):
+        """Display which enhanced features are enabled"""
+        print("\n" + "="*60)
+        print("Encrypted Credentials:", "✓" if ENHANCED_FEATURES_AVAILABLE['encryption'] else "✗")
+        print("Advanced Review:", "✓" if (ENHANCED_FEATURES_AVAILABLE['advanced_review'] and self.advanced_reviewer) else "✗")
+        print("Intelligent Processing:", "✓" if (ENHANCED_FEATURES_AVAILABLE['intelligent_processing'] and self.content_processor) else "✗")
+        print("="*60 + "\n")
+
+        self.update_status("Ready")
+
+    def refresh_advanced_modules(self):
+        """Refresh advanced modules with updated collections and settings"""
+        self.update_status("Refreshing advanced modules...")
+
+        if ENHANCED_FEATURES_AVAILABLE['intelligent_processing'] and IntelligentContentProcessor:
+            if self.content_processor:
+                try:
+                    # Update processor config with current collections
+                    processor_config = {
+                        'rag_threshold': 10000,
+                        'max_prompt_tokens': self.max_tokens.get(),
+                        'chunk_size': 1000,
+                        'chunk_overlap': 100,
+                        'document_store_path': os.path.join(
+                            os.path.dirname(os.path.abspath(__file__)),
+                            'document_store.db'
+                        ),
+                        'base_url': self.openwebui_base_url,
+                        'api_key': self.openwebui_api_key,
+                        'selected_collections': self.selected_knowledge_collections
+                    }
+                    self.content_processor.config = processor_config
+                    self.content_processor.rag_threshold = processor_config['rag_threshold']
+                    self.content_processor.max_prompt_tokens = processor_config['max_prompt_tokens']
+                    self.log_message("✓ Content processor refreshed with updated settings")
+                except Exception as e:
+                    self.log_message(f"⚠ Failed to refresh content processor: {e}")
+
+        if ENHANCED_FEATURES_AVAILABLE['advanced_review'] and TechnicalDocumentReviewer:
+            if self.advanced_reviewer:
+                try:
+                    # Update reviewer config with current collections
+                    self.advanced_reviewer.config['base_url'] = self.openwebui_base_url
+                    self.advanced_reviewer.config['api_key'] = self.openwebui_api_key
+                    self.advanced_reviewer.config['review_model'] = self.selected_model.get() or 'llama3.1:latest'
+                    self.advanced_reviewer.config['comment_model'] = self.selected_model.get() or 'llama3.1:latest'
+                    self.advanced_reviewer.config['selected_collections'] = self.selected_knowledge_collections
+                    self.log_message("✓ Document reviewer refreshed with updated settings")
+                except Exception as e:
+                    self.log_message(f"⚠ Failed to refresh document reviewer: {e}")
+
+        self.update_status("Advanced modules refreshed")
         
     def configure_dark_theme(self):
         """Configure dark theme"""
@@ -2658,15 +2734,20 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
         def save_and_close():
             self.openwebui_base_url = url_var.get()
             self.openwebui_api_key = key_var.get()
-            
+
             # Get selected knowledge collections
             self.selected_knowledge_collections = []
             for idx in knowledge_list.curselection():
                 self.selected_knowledge_collections.append(
                     self.available_knowledge_collections[idx])
-            
+
             self.save_settings()
             self.update_config_status()
+
+            # Refresh advanced modules with new collections and settings
+            if self.content_processor or self.advanced_reviewer:
+                self.refresh_advanced_modules()
+
             config_window.destroy()
         
         ttk.Button(btn_frame, text="Save", command=save_and_close).pack(side=tk.RIGHT, padx=(5, 0))
