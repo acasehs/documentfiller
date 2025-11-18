@@ -47,3 +47,5 @@ Thumbs.db
 # Config files with sensitive data
 *.key
 *.pem
+config_credentials.enc
+openwebui_config.json
