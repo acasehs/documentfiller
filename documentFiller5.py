@@ -1450,9 +1450,12 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
 
         # Console tab
         self.create_console_tab()
-        
+
+        # Status bar at the bottom
+        self.create_status_bar(main_container)
+
         # Update config status
-        self.update_config_status()   
+        self.update_config_status()
 
         self.add_markdown_export_functionality()
         self.add_table_editing_dialog()
@@ -2056,12 +2059,41 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
         self.notebook.add(console_frame, text="Console Log")
         console_frame.columnconfigure(0, weight=1)
         console_frame.rowconfigure(0, weight=1)
-        
+
         self.console = scrolledtext.ScrolledText(console_frame, height=20,
                                                 bg="#1e1e1e", fg="#ffffff",
                                                 font=("Consolas", 9))
         self.console.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), padx=5, pady=5)
-    
+
+    def create_status_bar(self, parent):
+        """Create status bar at bottom of application"""
+        status_frame = ttk.Frame(parent, relief=tk.SUNKEN, padding="2")
+        status_frame.grid(row=3, column=0, sticky=(tk.W, tk.E), pady=(5, 0))
+
+        # Status label with initial text
+        self.status_var = tk.StringVar(value="Ready")
+        self.status_label = ttk.Label(status_frame, textvariable=self.status_var,
+                                     font=("Arial", 9), foreground="#666666")
+        self.status_label.pack(side=tk.LEFT, fill=tk.X, expand=True)
+
+        # Optional: Add a timestamp label on the right
+        self.status_time_var = tk.StringVar(value="")
+        self.status_time_label = ttk.Label(status_frame, textvariable=self.status_time_var,
+                                           font=("Arial", 8), foreground="#888888")
+        self.status_time_label.pack(side=tk.RIGHT, padx=5)
+
+    def update_status(self, message):
+        """Update status bar with a message"""
+        if hasattr(self, 'status_var'):
+            self.status_var.set(message)
+            # Update timestamp
+            if hasattr(self, 'status_time_var'):
+                from datetime import datetime
+                self.status_time_var.set(datetime.now().strftime("%H:%M:%S"))
+            # Force update
+            if hasattr(self, 'root'):
+                self.root.update_idletasks()
+
     def setup_text_tags(self):
         """Setup text widget tags for markdown formatting"""
         self.generated_text.tag_configure("bold", font=("Consolas", 10, "bold"))
@@ -3113,9 +3145,9 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
                         strategy_result = self.content_processor.determine_processing_strategy(
                             full_content, [self.selected_section], prompt
                         )
-                        
+
                         self.log_message(f"📊 Processing Strategy: {strategy_result.method} - {strategy_result.reason}")
-                        
+
                         if strategy_result.method == "rag" and self.document_path:
                             context, chunks = self.content_processor.build_rag_context(
                                 prompt, self.document_path, [self.selected_section]
@@ -3125,15 +3157,15 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
                                 self.log_message(f"✓ Enhanced with RAG context ({len(chunks)} chunks)")
                 except Exception as e:
                     self.log_message(f"Note: Could not apply intelligent processing: {e}")
-            
+
             # Log the prompt to history first
             self.log_prompt_history(prompt, is_sent=True)
-            
+
             headers = {
                 'Authorization': f'Bearer {self.openwebui_api_key}',
                 'Content-Type': 'application/json'
             }
-            
+
             payload = {
                 "model": self.selected_model.get(),
                 "messages": [{"role": "user", "content": prompt}],
@@ -3141,18 +3173,18 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
                 "temperature": self.temperature.get(),
                 "max_tokens": self.max_tokens.get()
             }
-            
+
             if self.selected_knowledge_collections:
                 payload["files"] = [
-                    {"type": "collection", "id": col['id']} 
+                    {"type": "collection", "id": col['id']}
                     for col in self.selected_knowledge_collections
                 ]
-            
+
             response = requests.post(
                 f"{self.openwebui_base_url}/api/chat/completions",
                 headers=headers, json=payload, timeout=300
             )
-            
+
             if response.status_code == 200:
                 result = response.json()
                 if 'choices' in result and len(result['choices']) > 0:
@@ -3173,7 +3205,93 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
                 error_msg = f"Error: HTTP {response.status_code} - {response.text}"
                 self.log_prompt_history(error_msg, error_msg, is_sent=False)
                 return error_msg
-                
+
+        except Exception as e:
+            error_msg = f"Error: {str(e)}"
+            self.log_prompt_history(error_msg, error_msg, is_sent=False)
+            return error_msg
+
+    def query_openwebui_streaming(self, prompt, callback=None):
+        """Query OpenWebUI API with streaming support"""
+        try:
+            if self.content_processor and self.document and self.selected_section:
+                try:
+                    full_content = self.selected_section.get_existing_content()
+                    if len(full_content) > 100:
+                        strategy_result = self.content_processor.determine_processing_strategy(
+                            full_content, [self.selected_section], prompt
+                        )
+
+                        self.log_message(f"📊 Processing Strategy: {strategy_result.method} - {strategy_result.reason}")
+
+                        if strategy_result.method == "rag" and self.document_path:
+                            context, chunks = self.content_processor.build_rag_context(
+                                prompt, self.document_path, [self.selected_section]
+                            )
+                            if context and len(chunks) > 0:
+                                prompt = f"RELEVANT CONTEXT FROM DOCUMENT:\n{context}\n\n===\n\nORIGINAL QUERY:\n{prompt}"
+                                self.log_message(f"✓ Enhanced with RAG context ({len(chunks)} chunks)")
+                except Exception as e:
+                    self.log_message(f"Note: Could not apply intelligent processing: {e}")
+
+            # Log the prompt to history first
+            self.log_prompt_history(prompt, is_sent=True)
+
+            headers = {
+                'Authorization': f'Bearer {self.openwebui_api_key}',
+                'Content-Type': 'application/json'
+            }
+
+            payload = {
+                "model": self.selected_model.get(),
+                "messages": [{"role": "user", "content": prompt}],
+                "stream": True,
+                "temperature": self.temperature.get(),
+                "max_tokens": self.max_tokens.get()
+            }
+
+            if self.selected_knowledge_collections:
+                payload["files"] = [
+                    {"type": "collection", "id": col['id']}
+                    for col in self.selected_knowledge_collections
+                ]
+
+            response = requests.post(
+                f"{self.openwebui_base_url}/api/chat/completions",
+                headers=headers, json=payload, timeout=300, stream=True
+            )
+
+            if response.status_code == 200:
+                full_response = ""
+                for line in response.iter_lines():
+                    if line:
+                        line = line.decode('utf-8')
+                        if line.startswith('data: '):
+                            line = line[6:]  # Remove 'data: ' prefix
+
+                        if line == '[DONE]':
+                            break
+
+                        try:
+                            chunk = json.loads(line)
+                            if 'choices' in chunk and len(chunk['choices']) > 0:
+                                delta = chunk['choices'][0].get('delta', {})
+                                content = delta.get('content', '')
+                                if content:
+                                    full_response += content
+                                    if callback:
+                                        callback(content)
+                        except json.JSONDecodeError:
+                            continue
+
+                # Log the complete response to history
+                self.log_prompt_history(full_response, full_response, is_sent=False)
+                return full_response
+            else:
+                error_msg = f"Error: HTTP {response.status_code} - {response.text}"
+                self.log_prompt_history(error_msg, error_msg, is_sent=False)
+                return error_msg
+
         except Exception as e:
             error_msg = f"Error: {str(e)}"
             self.log_prompt_history(error_msg, error_msg, is_sent=False)
@@ -4609,17 +4727,17 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
         """Add content to section with markdown to Word formatting conversion"""
         heading_para = section.paragraph
         doc_paragraphs = list(self.document.paragraphs)
-        
+
         # Find heading index
         heading_index = -1
         for i, para in enumerate(doc_paragraphs):
             if para.text.strip() == heading_para.text.strip():
                 heading_index = i
                 break
-        
+
         if heading_index == -1:
             raise Exception("Could not find section heading")
-        
+
         # Determine insertion point
         if append and section.content_paragraphs:
             next_heading_index = len(doc_paragraphs)
@@ -4630,28 +4748,68 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
             insertion_index = next_heading_index
         else:
             insertion_index = heading_index + 1
-        
-        # Split content into paragraphs
-        content_paragraphs = content.split('\n')
-        
+
+        # Split content into lines for processing
+        lines = content.split('\n')
+
         inserted_paras = []
-        for para_text in content_paragraphs:
-            if para_text.strip():
+        i = 0
+        while i < len(lines):
+            line = lines[i]
+
+            # Handle code blocks
+            if line.strip().startswith('```'):
+                language = line.strip()[3:].strip()
+                code_lines = []
+                i += 1
+                while i < len(lines) and not lines[i].strip().startswith('```'):
+                    code_lines.append(lines[i])
+                    i += 1
+                i += 1  # Skip closing ```
+
+                # Create paragraph for code block
+                if insertion_index < len(self.document.paragraphs):
+                    new_para = self.document.paragraphs[insertion_index].insert_paragraph_before()
+                else:
+                    new_para = self.document.add_paragraph()
+
+                # Add code block with formatting
+                code_text = '\n'.join(code_lines)
+                run = new_para.add_run(code_text)
+                run.font.name = 'Consolas'
+                run.font.size = Pt(9)
+                run.font.color.rgb = RGBColor(0, 128, 0)
+
+                try:
+                    new_para.paragraph_format.left_indent = Inches(0.5)
+                    new_para.paragraph_format.space_before = Pt(6)
+                    new_para.paragraph_format.space_after = Pt(6)
+                except:
+                    pass
+
+                inserted_paras.append(new_para)
+                insertion_index += 1
+                continue
+
+            # Handle regular lines
+            if line.strip():
                 # Create new paragraph
                 if insertion_index < len(self.document.paragraphs):
                     new_para = self.document.paragraphs[insertion_index].insert_paragraph_before()
                 else:
                     new_para = self.document.add_paragraph()
-                
+
                 # Apply markdown formatting to paragraph
-                self.apply_markdown_to_paragraph(new_para, para_text.strip())
-                
+                self.apply_markdown_to_paragraph(new_para, line.strip())
+
                 # Apply configured formatting
                 self.apply_configured_formatting(new_para)
-                
+
                 inserted_paras.append(new_para)
                 insertion_index += 1
-        
+
+            i += 1
+
         # Update section's content paragraphs
         if not append:
             section.content_paragraphs = inserted_paras
@@ -5006,6 +5164,42 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
     def apply_markdown_to_paragraph(self, paragraph, text):
         """Enhanced markdown to paragraph conversion with additional features"""
         try:
+            # Handle images ![alt](url)
+            image_match = re.match(r'^!\[(.*?)\]\((.*?)\)$', text.strip())
+            if image_match:
+                alt_text = image_match.group(1)
+                url = image_match.group(2)
+                paragraph.clear()
+                run = paragraph.add_run(f"[Image: {alt_text}]")
+                run.font.italic = True
+                run.font.color.rgb = RGBColor(128, 128, 128)
+                return
+
+            # Handle task lists - [ ] and - [x]
+            task_match = re.match(r'^[-*+]\s+\[([ xX])\]\s+(.*)$', text.strip())
+            if task_match:
+                checked = task_match.group(1).lower() == 'x'
+                task_text = task_match.group(2)
+                try:
+                    paragraph.style = 'List Bullet'
+                except:
+                    paragraph.style = 'Normal'
+                    try:
+                        paragraph.paragraph_format.left_indent = Inches(0.25)
+                    except:
+                        pass
+                paragraph.clear()
+                checkbox_run = paragraph.add_run("☑ " if checked else "☐ ")
+                checkbox_run.font.name = 'Segoe UI Symbol'
+                text_run = paragraph.add_run(task_text)
+                if checked:
+                    try:
+                        text_run.font.strike = True
+                        text_run.font.color.rgb = RGBColor(128, 128, 128)
+                    except:
+                        pass
+                return
+
             # Handle heading levels 1-6
             if text.startswith('#'):
                 heading_level = 0
@@ -5014,7 +5208,7 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
                         heading_level += 1
                     else:
                         break
-                
+
                 if 1 <= heading_level <= 6:
                     # Map markdown heading level to Word heading style
                     if heading_level <= 4:
@@ -5027,9 +5221,9 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
                     else:
                         # Fall back to normal text with bold for higher levels
                         paragraph.style = 'Normal'
-                        
+
                     text = text[heading_level:].strip()
-            
+
             # Handle bullet points (*, -, +)
             elif text.strip().startswith(('* ', '- ', '+ ')):
                 try:
@@ -5045,7 +5239,7 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
                     text = "• " + text.strip()[2:].strip()  # Add bullet character
                 else:
                     text = text.strip()[2:].strip()  # Remove the bullet marker
-            
+
             # Handle numbered lists
             elif re.match(r'^\d+\.', text.strip()):
                 try:
@@ -5063,30 +5257,30 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
                         except:
                             pass
                         # Keep the number in text
-                
+
                 # Extract number for manual handling if needed
                 num_match = re.match(r'^(\d+)\.', text.strip())
                 if num_match:
                     num = num_match.group(1)
                     text = text.strip()[len(num)+1:].strip()  # Remove the number and dot
-                    
+
                     # For manual numbering if style failed
                     try:
                         if paragraph.style.name == 'Normal':
                             text = f"{num}. {text}"
                     except:
                         text = f"{num}. {text}"
-            
+
             # Handle blockquotes (handled separately in main function now)
             elif text.strip().startswith('> '):
                 text = text.strip()[2:].strip()  # Remove the quote marker
-            
+
             # Clear paragraph text since we'll re-add it with formatting
             paragraph.clear()
-            
+
             # Enhanced inline formatting processing
             self._process_inline_formatting(paragraph, text)
-            
+
         except Exception as e:
             print(f"Error applying markdown to paragraph: {e}")
             # Fallback to plain text
@@ -7133,7 +7327,7 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
                                                           bg='#1e1e1e', fg='#ffffff',
                                                           insertbackground='#ffffff', wrap=tk.WORD)
         self.chat_history_text.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
-        self.chat_history_text.config(state=tk.DISABLED)
+        # Keep editable so users can modify AI responses
 
         # Message input
         input_frame = ttk.LabelFrame(right_frame, text="Your Message", padding="5")
@@ -7245,7 +7439,7 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
             self.log_message("Chat history cleared")
 
     def refresh_chat_display(self):
-        """Refresh the chat history display"""
+        """Refresh the chat history display with justification and editable responses"""
         if not self.current_chat_section:
             return
 
@@ -7255,18 +7449,36 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
         self.chat_history_text.config(state=tk.NORMAL)
         self.chat_history_text.delete('1.0', tk.END)
 
-        for role, message in history:
+        for idx, (role, message) in enumerate(history):
             if role == "user":
-                self.chat_history_text.insert(tk.END, f"YOU:\n{message}\n\n", "user")
+                # Right-justified sent messages
+                self.chat_history_text.insert(tk.END, "YOU:\n", "user_label")
+                self.chat_history_text.insert(tk.END, f"{message}\n\n", "user_msg")
             else:
-                self.chat_history_text.insert(tk.END, f"AI:\n{message}\n\n", "assistant")
-                self.chat_history_text.insert(tk.END, "-" * 60 + "\n\n")
+                # Left-justified received messages (editable)
+                self.chat_history_text.insert(tk.END, "AI:\n", "assistant_label")
+                msg_start = self.chat_history_text.index(tk.END)
+                self.chat_history_text.insert(tk.END, f"{message}\n", "assistant_msg")
+                msg_end = self.chat_history_text.index(tk.END)
 
-        self.chat_history_text.tag_config("user", foreground="#4CAF50", font=("Arial", 10, "bold"))
-        self.chat_history_text.tag_config("assistant", foreground="#2196F3", font=("Arial", 10, "bold"))
+                # Tag this message for editability tracking
+                tag_name = f"ai_msg_{idx}"
+                self.chat_history_text.tag_add(tag_name, msg_start, msg_end)
 
-        self.chat_history_text.config(state=tk.DISABLED)
+                self.chat_history_text.insert(tk.END, "-" * 60 + "\n\n", "separator")
+
+        # Configure tags for styling and justification
+        self.chat_history_text.tag_config("user_label", foreground="#4CAF50", font=("Arial", 10, "bold"), justify=tk.RIGHT)
+        self.chat_history_text.tag_config("user_msg", foreground="#4CAF50", font=("Arial", 10), justify=tk.RIGHT, background="#1a3a1a")
+        self.chat_history_text.tag_config("assistant_label", foreground="#2196F3", font=("Arial", 10, "bold"), justify=tk.LEFT)
+        self.chat_history_text.tag_config("assistant_msg", foreground="#2196F3", font=("Arial", 10), justify=tk.LEFT, background="#1a2a3a")
+        self.chat_history_text.tag_config("separator", foreground="#666666")
+
+        # Auto-scroll to bottom
         self.chat_history_text.see(tk.END)
+
+        # Keep text widget editable for AI responses
+        # (Note: user can edit AI responses directly in the text widget)
 
     def send_chat_message(self):
         """Send a message in the section chat"""
@@ -7289,7 +7501,7 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
         thread.start()
 
     def process_chat_message(self, user_message):
-        """Process chat message in background thread"""
+        """Process chat message in background thread with streaming"""
         try:
             section_hash = self.current_chat_section.get_section_hash()
 
@@ -7316,22 +7528,45 @@ Previous conversation:
             context += f"\nUser's current question/request: {user_message}\n\n"
             context += "Respond helpfully. If the user asks you to write or modify content, provide the complete updated content in your response."
 
-            # Query AI
+            # Add placeholder for streaming response
+            self.section_chat_history[section_hash].append(("assistant", ""))
+            current_response_idx = len(self.section_chat_history[section_hash]) - 1
+
+            # Update status
+            self.root.after(0, lambda: self.update_status("Sending message to AI..."))
             self.log_message("Sending chat message to AI...")
-            response = self.query_openwebui(context)
+
+            # Define streaming callback
+            def on_chunk(chunk):
+                """Handle each streaming chunk"""
+                # Update the response in history
+                role, current_text = self.section_chat_history[section_hash][current_response_idx]
+                self.section_chat_history[section_hash][current_response_idx] = (role, current_text + chunk)
+                # Refresh display
+                self.root.after(0, self.refresh_chat_display)
+                # Update status
+                self.root.after(0, lambda: self.update_status("Receiving response..."))
+
+            # Query AI with streaming
+            response = self.query_openwebui_streaming(context, callback=on_chunk)
 
             if response and not response.startswith("Error:"):
-                # Add AI response to history
-                self.section_chat_history[section_hash].append(("assistant", response))
+                # Ensure final response is in history
+                self.section_chat_history[section_hash][current_response_idx] = ("assistant", response)
                 self.root.after(0, self.refresh_chat_display)
                 self.root.after(0, lambda: self.chat_apply_btn.config(state=tk.NORMAL))
+                self.root.after(0, lambda: self.update_status("Response received"))
                 self.log_message("AI response received")
             else:
+                # Remove placeholder on error
+                self.section_chat_history[section_hash].pop(current_response_idx)
                 self.log_message(f"Chat error: {response}")
-                messagebox.showerror("Error", f"Failed to get response: {response}")
+                self.root.after(0, lambda: self.update_status("Error receiving response"))
+                self.root.after(0, lambda: messagebox.showerror("Error", f"Failed to get response: {response}"))
 
         except Exception as e:
             self.log_message(f"Chat error: {str(e)}")
+            self.root.after(0, lambda: self.update_status(f"Error: {str(e)}"))
             self.root.after(0, lambda: messagebox.showerror("Error", f"Chat failed: {str(e)}"))
         finally:
             self.root.after(0, lambda: self.chat_send_btn.config(state=tk.NORMAL))
