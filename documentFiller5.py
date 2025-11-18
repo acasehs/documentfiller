@@ -3421,6 +3421,32 @@ Rewritten text with consistent {target_tense} tense:"""
             self.log_message("🔄 Re-enabling generate button...")
             self.root.after(0, lambda: self.generate_btn.config(state='normal'))
             
+    def query_openwebui_with_logging(self, prompt, operation_name="API Request"):
+        """Query OpenWebUI with detailed logging - wrapper for all operations"""
+        import time
+
+        self.log_message("="*60)
+        self.log_message(f"Starting: {operation_name}")
+        self.log_message(f"📊 Prompt size: {len(prompt)} characters")
+        self.log_message(f"🚀 Sending request to OpenWebUI API...")
+        self.log_message(f"   Model: {self.selected_model.get()}")
+        self.log_message(f"   Temperature: {self.temperature.get()}")
+        self.log_message(f"   Max tokens: {self.max_tokens.get()}")
+        self.log_message(f"   Timeout: 300 seconds (5 minutes)")
+
+        start_time = time.time()
+        response = self.query_openwebui(prompt)
+        elapsed_time = time.time() - start_time
+
+        if response and not response.startswith("Error:"):
+            self.log_message(f"⏱️  Response received in {elapsed_time:.1f} seconds")
+            self.log_message(f"✅ {operation_name} completed ({len(response)} characters)")
+        else:
+            self.log_message(f"❌ {operation_name} failed: {response}")
+
+        self.log_message("="*60)
+        return response
+
     def query_openwebui(self, prompt):
         """Query OpenWebUI API (non-streaming with detailed error handling)"""
         try:
@@ -7910,16 +7936,21 @@ Rewritten text with consistent {target_tense} tense:"""
         thread.start()
 
     def process_chat_message(self, user_message):
-        """Process chat message in background thread with streaming"""
+        """Process chat message in background thread (non-streaming with detailed logging)"""
         try:
             section_hash = self.current_chat_section.get_section_hash()
+            section = self.current_chat_section
 
             # Add user message to history
             self.section_chat_history[section_hash].append(("user", user_message))
             self.root.after(0, self.refresh_chat_display)
 
             # Build context for AI
-            section = self.current_chat_section
+            self.log_message("="*60)
+            self.log_message("Section Chat")
+            self.log_message(f"📄 Section: {section.get_full_path()}")
+            self.log_message(f"💬 Message: {user_message[:80]}..." if len(user_message) > 80 else f"💬 Message: {user_message}")
+
             context = f"""You are helping refine content for a document section.
 
 Section: {section.get_full_path()}
@@ -7929,54 +7960,52 @@ Current content:
 
 Previous conversation:
 """
-            # Include last 4 messages for context
             history = self.section_chat_history[section_hash]
-            for role, msg in history[-5:-1]:  # Exclude the current user message
+            for role, msg in history[-5:-1]:
                 context += f"\n{role.upper()}: {msg}\n"
 
             context += f"\nUser's current question/request: {user_message}\n\n"
             context += "Respond helpfully. If the user asks you to write or modify content, provide the complete updated content in your response."
 
-            # Add placeholder for streaming response
-            self.section_chat_history[section_hash].append(("assistant", ""))
-            current_response_idx = len(self.section_chat_history[section_hash]) - 1
+            self.log_message(f"📊 Context size: {len(context)} characters")
+            self.log_message(f"🚀 Sending to OpenWebUI API...")
+            self.log_message(f"   Model: {self.selected_model.get()}")
+            self.log_message(f"   Temperature: {self.temperature.get()}")
+            self.root.after(0, lambda: self.update_status("🌐 Sending chat message..."))
 
-            # Update status
-            self.root.after(0, lambda: self.update_status("Sending message to AI..."))
-            self.log_message("Sending chat message to AI...")
+            import time
+            start_time = time.time()
+            self.root.after(0, lambda: self.update_status("⏳ Waiting for response..."))
+            response = self.query_openwebui(context)
+            elapsed_time = time.time() - start_time
 
-            # Define streaming callback
-            def on_chunk(chunk):
-                """Handle each streaming chunk"""
-                # Update the response in history
-                role, current_text = self.section_chat_history[section_hash][current_response_idx]
-                self.section_chat_history[section_hash][current_response_idx] = (role, current_text + chunk)
-                # Refresh display
-                self.root.after(0, self.refresh_chat_display)
-                # Update status
-                self.root.after(0, lambda: self.update_status("Receiving response..."))
-
-            # Query AI with streaming
-            response = self.query_openwebui_streaming(context, callback=on_chunk)
+            self.log_message(f"⏱️  Response received in {elapsed_time:.1f} seconds")
 
             if response and not response.startswith("Error:"):
-                # Ensure final response is in history
-                self.section_chat_history[section_hash][current_response_idx] = ("assistant", response)
+                self.section_chat_history[section_hash].append(("assistant", response))
+                self.log_message(f"✅ Chat completed ({len(response)} characters)")
                 self.root.after(0, self.refresh_chat_display)
                 self.root.after(0, lambda: self.chat_apply_btn.config(state=tk.NORMAL))
-                self.root.after(0, lambda: self.update_status("Response received"))
-                self.log_message("AI response received")
+                self.root.after(0, lambda: self.update_status("✅ Response received"))
+                self.log_message("="*60)
             else:
-                # Remove placeholder on error
-                self.section_chat_history[section_hash].pop(current_response_idx)
-                self.log_message(f"Chat error: {response}")
-                self.root.after(0, lambda: self.update_status("Error receiving response"))
+                self.log_message(f"❌ Chat failed: {response}")
+                self.root.after(0, lambda: self.update_status(f"❌ Failed: {response}"))
                 self.root.after(0, lambda: messagebox.showerror("Error", f"Failed to get response: {response}"))
+                self.log_message("="*60)
 
+        except requests.exceptions.Timeout:
+            self.log_message(f"⏰ TIMEOUT: Request timed out after 300 seconds")
+            self.root.after(0, lambda: self.update_status("⏰ Request timed out"))
+            self.root.after(0, lambda: messagebox.showerror("Timeout", "Request timed out after 5 minutes"))
+            self.log_message("="*60)
         except Exception as e:
-            self.log_message(f"Chat error: {str(e)}")
-            self.root.after(0, lambda: self.update_status(f"Error: {str(e)}"))
+            self.log_message(f"❌ ERROR: {str(e)}")
+            self.root.after(0, lambda: self.update_status(f"❌ Error: {str(e)}"))
             self.root.after(0, lambda: messagebox.showerror("Error", f"Chat failed: {str(e)}"))
+            self.log_message("="*60)
+            import traceback
+            self.log_message(traceback.format_exc())
         finally:
             self.root.after(0, lambda: self.chat_send_btn.config(state=tk.NORMAL))
 
