@@ -1607,8 +1607,205 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
         except Exception as e:
             print(f"Error setting up enhanced text widget colors: {e}")
 
+    def create_menu_bar(self):
+        """Create comprehensive menu bar"""
+        menubar = tk.Menu(self.root)
+        self.root.config(menu=menubar)
+
+        # ===== FILE MENU =====
+        file_menu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="File", menu=file_menu)
+
+        file_menu.add_command(label="Load Document...", command=self.browse_document, accelerator="Ctrl+O")
+        file_menu.add_command(label="Reload Document", command=self.reload_document_wrapper, accelerator="Ctrl+R")
+        file_menu.add_separator()
+        file_menu.add_command(label="Export Document...", command=self.export_document_to_file, accelerator="Ctrl+E")
+        file_menu.add_separator()
+        file_menu.add_command(label="Load Configuration...", command=self.browse_config_file)
+        file_menu.add_command(label="Save Configuration As...", command=self.save_config_as)
+        file_menu.add_separator()
+        file_menu.add_command(label="Exit", command=self.root.quit, accelerator="Ctrl+Q")
+
+        # ===== EDIT MENU =====
+        edit_menu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="Edit", menu=edit_menu)
+
+        edit_menu.add_command(label="Manage Prompts...", command=self.open_prompt_manager, accelerator="Ctrl+P")
+        edit_menu.add_separator()
+        edit_menu.add_command(label="Config Files...", command=self.open_config_file_manager)
+        edit_menu.add_command(label="Formatting Options...", command=self.open_formatting_dialog)
+        edit_menu.add_command(label="Auto Features...", command=self.open_auto_features_dialog)
+
+        # ===== SECTION MENU =====
+        section_menu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="Section", menu=section_menu)
+
+        section_menu.add_command(label="Generate Content", command=self.generate_content, accelerator="Ctrl+G")
+        section_menu.add_command(label="Review Section", command=self.conduct_section_review, accelerator="Ctrl+Shift+R")
+        section_menu.add_separator()
+        section_menu.add_command(label="Analyze Tenses", command=self.analyze_document_tenses)
+        section_menu.add_command(label="Check & Fix Tenses", command=self.check_and_fix_section_tenses)
+        section_menu.add_separator()
+        section_menu.add_command(label="Apply Suggestions", command=self.apply_review_suggestions)
+        section_menu.add_command(label="Regenerate Review", command=self.regenerate_from_review)
+        section_menu.add_separator()
+        section_menu.add_command(label="Processing Strategy...", command=lambda: self.show_processing_strategy_dialog(scope="section"))
+
+        # ===== DOCUMENT MENU =====
+        document_menu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="Document", menu=document_menu)
+
+        document_menu.add_command(label="Review Whole Document", command=self.review_whole_document, accelerator="Ctrl+Shift+D")
+        document_menu.add_command(label="Check & Fix Document Tenses", command=self.check_and_fix_document_tenses)
+        document_menu.add_command(label="Auto Complete Document", command=self.auto_complete_document, accelerator="Ctrl+Shift+A")
+        document_menu.add_separator()
+        document_menu.add_command(label="Processing Strategy...", command=lambda: self.show_processing_strategy_dialog(scope="document"))
+
+        # ===== TOOLS MENU =====
+        tools_menu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="Tools", menu=tools_menu)
+
+        tools_menu.add_command(label="Configure AI...", command=self.open_config_dialog, accelerator="Ctrl+Shift+C")
+        tools_menu.add_command(label="Credentials Manager...", command=self.manage_encrypted_credentials_dialog)
+        tools_menu.add_separator()
+        tools_menu.add_command(label="External RAG Content...", command=self.open_external_content_manager)
+        tools_menu.add_separator()
+        tools_menu.add_command(label="Prompt History...", command=self.show_prompt_history_dialog)
+        tools_menu.add_command(label="Section Chat...", command=self.open_section_chat)
+
+        # ===== VIEW MENU =====
+        view_menu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="View", menu=view_menu)
+
+        view_menu.add_command(label="Preview Tab", command=lambda: self.notebook.select(0))
+        view_menu.add_command(label="Prompt Tab", command=lambda: self.notebook.select(1))
+        view_menu.add_command(label="Console Tab", command=lambda: self.notebook.select(2))
+        view_menu.add_separator()
+        view_menu.add_command(label="Prompt History Tab", command=lambda: self.notebook.select(3))
+        view_menu.add_command(label="Section Chat Tab", command=lambda: self.notebook.select(4))
+
+        # ===== HELP MENU =====
+        help_menu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="Help", menu=help_menu)
+
+        help_menu.add_command(label="About", command=self.show_about_dialog)
+        help_menu.add_command(label="Keyboard Shortcuts", command=self.show_shortcuts_dialog)
+
+        # Bind keyboard shortcuts
+        self.root.bind('<Control-o>', lambda e: self.browse_document())
+        self.root.bind('<Control-r>', lambda e: self.reload_document_wrapper())
+        self.root.bind('<Control-e>', lambda e: self.export_document_to_file())
+        self.root.bind('<Control-q>', lambda e: self.root.quit())
+        self.root.bind('<Control-p>', lambda e: self.open_prompt_manager())
+        self.root.bind('<Control-g>', lambda e: self.generate_content())
+        self.root.bind('<Control-Shift-R>', lambda e: self.conduct_section_review())
+        self.root.bind('<Control-Shift-D>', lambda e: self.review_whole_document())
+        self.root.bind('<Control-Shift-A>', lambda e: self.auto_complete_document())
+        self.root.bind('<Control-Shift-C>', lambda e: self.open_config_dialog())
+
+    def show_about_dialog(self):
+        """Show about dialog"""
+        about_text = """
+Document Content Generator
+Version 5.0
+
+OpenWebUI Integration for Advanced Document Processing
+
+Features:
+• AI-powered content generation
+• Section and document-level operations
+• Tense consistency checking
+• Advanced review and suggestions
+• External RAG content support
+• Intelligent processing strategies
+
+© 2024 - Powered by OpenWebUI
+        """
+        messagebox.showinfo("About", about_text.strip())
+
+    def show_shortcuts_dialog(self):
+        """Show keyboard shortcuts dialog"""
+        # Prevent duplicate modal
+        if 'shortcuts_dialog' in self.open_modals and self.open_modals['shortcuts_dialog'].winfo_exists():
+            self.open_modals['shortcuts_dialog'].lift()
+            self.open_modals['shortcuts_dialog'].focus_force()
+            return
+
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Keyboard Shortcuts")
+        dialog.geometry("500x600")
+        dialog.configure(bg="#2b2b2b")
+        dialog.grab_set()
+
+        # Track this modal
+        self.open_modals['shortcuts_dialog'] = dialog
+        dialog.protocol("WM_DELETE_WINDOW", lambda: self._close_modal(dialog, 'shortcuts_dialog'))
+
+        main_frame = ttk.Frame(dialog, padding="20")
+        main_frame.pack(fill=tk.BOTH, expand=True)
+
+        ttk.Label(main_frame, text="Keyboard Shortcuts",
+                font=("Arial", 14, "bold")).pack(anchor=tk.W, pady=(0, 15))
+
+        # Create scrollable text area for shortcuts
+        text_frame = ttk.Frame(main_frame)
+        text_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
+
+        shortcuts_text = scrolledtext.ScrolledText(text_frame, height=25, width=60,
+                                                   bg="#1e1e1e", fg="#ffffff",
+                                                   font=("Consolas", 10), wrap=tk.WORD)
+        shortcuts_text.pack(fill=tk.BOTH, expand=True)
+
+        shortcuts_content = """
+FILE OPERATIONS
+─────────────────────────────────────────
+Ctrl+O          Load Document
+Ctrl+R          Reload Document
+Ctrl+E          Export Document
+Ctrl+Q          Exit Application
+
+EDITING & PROMPTS
+─────────────────────────────────────────
+Ctrl+P          Manage Prompts
+
+SECTION OPERATIONS
+─────────────────────────────────────────
+Ctrl+G          Generate Content
+Ctrl+Shift+R    Review Section
+
+DOCUMENT OPERATIONS
+─────────────────────────────────────────
+Ctrl+Shift+D    Review Whole Document
+Ctrl+Shift+A    Auto Complete Document
+
+CONFIGURATION
+─────────────────────────────────────────
+Ctrl+Shift+C    Configure AI Settings
+
+VIEW NAVIGATION
+─────────────────────────────────────────
+Use View menu to switch between tabs:
+• Preview Tab
+• Prompt Tab
+• Console Tab
+• Prompt History Tab
+• Section Chat Tab
+        """
+
+        shortcuts_text.insert('1.0', shortcuts_content.strip())
+        shortcuts_text.config(state=tk.DISABLED)
+        shortcuts_text.config(insertbackground="#ffffff")
+        shortcuts_text.config(selectbackground="#3a5f8f")
+        shortcuts_text.config(selectforeground="#ffffff")
+
+        ttk.Button(main_frame, text="Close",
+                  command=lambda: self._close_modal(dialog, 'shortcuts_dialog')).pack(side=tk.RIGHT)
+
     def create_gui(self):
         """Create main GUI"""
+        # Create menu bar
+        self.create_menu_bar()
+
         main_container = ttk.Frame(self.root, padding="10")
         main_container.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         
@@ -1632,18 +1829,8 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
         # Reduce button padding and add more buttons to top row
         btn_style = {'padx': 1, 'pady': 2, 'side': tk.LEFT}
 
-        ttk.Button(btn_container, text="⚙ Config Files",
-                command=self.open_config_file_manager).pack(**btn_style)
-        ttk.Button(btn_container, text="⚙ Formatting",
-                command=self.open_formatting_dialog).pack(**btn_style)
-        ttk.Button(btn_container, text="🔄 Auto",
-                command=self.open_auto_features_dialog).pack(**btn_style)
         ttk.Button(btn_container, text="📎 External RAG",
                 command=self.open_external_content_manager).pack(**btn_style)
-        ttk.Button(btn_container, text="✏️ Master Prompt",
-                command=self.edit_master_prompt).pack(**btn_style)
-        ttk.Button(btn_container, text="📚 Prompts",
-                command=self.open_prompt_library).pack(**btn_style)
         ttk.Button(btn_container, text="🔐 Credentials",
                 command=self.manage_encrypted_credentials_dialog).pack(**btn_style)
         
@@ -1782,6 +1969,15 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
 
         ttk.Button(utilities_frame, text="📚 Manage Prompts",
                 command=self.open_prompt_manager).pack(fill=tk.X, pady=btn_pady)
+
+        ttk.Button(utilities_frame, text="⚙ Config Files",
+                command=self.open_config_file_manager).pack(fill=tk.X, pady=btn_pady)
+
+        ttk.Button(utilities_frame, text="⚙ Formatting",
+                command=self.open_formatting_dialog).pack(fill=tk.X, pady=btn_pady)
+
+        ttk.Button(utilities_frame, text="🔄 Auto Features",
+                command=self.open_auto_features_dialog).pack(fill=tk.X, pady=btn_pady)
         
         # Right panel
         right_panel = ttk.Frame(content_frame)
@@ -3685,152 +3881,6 @@ Rewritten text with consistent {target_tense} tense:"""
         except Exception as e:
             self.log_message(f"Error using prompt: {str(e)}")
 
-    def open_prompt_library(self):
-        """Open prompt library manager"""
-        library_window = tk.Toplevel(self.root)
-        library_window.title("Prompt Library")
-        library_window.geometry("900x600")
-        library_window.configure(bg="#2b2b2b")
-        library_window.grab_set()
-
-        main_frame = ttk.Frame(library_window, padding="20")
-        main_frame.pack(fill=tk.BOTH, expand=True)
-
-        ttk.Label(main_frame, text="Prompt Library Manager",
-                font=("Arial", 14, "bold")).pack(anchor=tk.W, pady=(0, 15))
-
-        # Create split view
-        pane = ttk.PanedWindow(main_frame, orient=tk.HORIZONTAL)
-        pane.pack(fill=tk.BOTH, expand=True, pady=(0, 15))
-
-        # Left panel - list of saved prompts
-        left_frame = ttk.Frame(pane, width=300)  # Set explicit width
-        pane.add(left_frame, weight=0)  # Don't resize with window
-
-        ttk.Label(left_frame, text="Saved Prompts:").pack(anchor=tk.W, pady=(0, 5))
-
-        # Prompt list with scrollbar
-        list_frame = ttk.Frame(left_frame)
-        list_frame.pack(fill=tk.BOTH, expand=True)
-
-        list_scrollbar = ttk.Scrollbar(list_frame)
-        list_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-
-        prompt_list = tk.Listbox(list_frame, yscrollcommand=list_scrollbar.set,
-                                bg="#1e1e1e", fg="#ffffff", font=("Consolas", 10),
-                                width=35)  # Increased width to prevent collapse
-        prompt_list.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        list_scrollbar.config(command=prompt_list.yview)
-
-        # Buttons for list operations
-        list_btn_frame = ttk.Frame(left_frame)
-        list_btn_frame.pack(fill=tk.X, pady=(5, 0))
-
-        ttk.Button(list_btn_frame, text="Import",
-                command=lambda: self.import_prompt_to_library(prompt_list, prompt_preview)).pack(side=tk.LEFT, padx=(0, 5))
-        ttk.Button(list_btn_frame, text="Remove",
-                command=lambda: self.remove_prompt_from_library(prompt_list, prompt_preview)).pack(side=tk.LEFT)
-
-        # Right panel - prompt preview
-        right_frame = ttk.Frame(pane)
-        pane.add(right_frame, weight=3)  # Takes up remaining space
-
-        ttk.Label(right_frame, text="Prompt Preview:").pack(anchor=tk.W, pady=(0, 5))
-
-        prompt_preview = scrolledtext.ScrolledText(right_frame, height=20,
-                                                bg="#1e1e1e", fg="#ffffff",
-                                                font=("Consolas", 10), wrap=tk.WORD)
-        prompt_preview.pack(fill=tk.BOTH, expand=True, pady=(0, 5))
-
-        prompt_preview.config(insertbackground="#ffffff")  # White cursor
-        prompt_preview.config(selectbackground="#3a5f8f")  # Blue selection background
-        prompt_preview.config(selectforeground="#ffffff")  # White selection text
-
-        # Buttons for preview operations
-        preview_btn_frame = ttk.Frame(right_frame)
-        preview_btn_frame.pack(fill=tk.X)
-
-        ttk.Button(preview_btn_frame, text="Use This Prompt",
-                command=lambda: self.use_selected_prompt(prompt_list, prompt_preview, library_window)).pack(side=tk.RIGHT)
-
-        # Bottom buttons
-        bottom_frame = ttk.Frame(main_frame)
-        bottom_frame.pack(fill=tk.X, pady=(0, 5))
-
-        ttk.Button(bottom_frame, text="Close",
-                command=library_window.destroy).pack(side=tk.RIGHT)
-
-        # Load saved prompts from library
-        self.load_prompt_library(prompt_list, prompt_preview)
-
-        # Bind selection event
-        prompt_list.bind('<<ListboxSelect>>',
-                        lambda e: self.on_prompt_select(e, prompt_list, prompt_preview))
-
-        # Ensure the window is properly sized and sash is positioned correctly
-        library_window.update_idletasks()
-        # Set sash position after window is fully rendered
-        library_window.after(100, lambda: pane.sashpos(0, 300))
-
-    def edit_master_prompt(self):
-        """Open master prompt editor"""
-        editor_window = tk.Toplevel(self.root)
-        editor_window.title("Edit Master Prompt")
-        editor_window.geometry("800x600")
-        editor_window.configure(bg="#2b2b2b")
-        editor_window.grab_set()
-        
-        main_frame = ttk.Frame(editor_window, padding="20")
-        main_frame.pack(fill=tk.BOTH, expand=True)
-        
-        ttk.Label(main_frame, text="Master Prompt Template:", 
-                font=("Arial", 12, "bold")).pack(anchor=tk.W, pady=(0, 5))
-        
-        info_label = ttk.Label(main_frame, 
-                            text="Variables: {section_name}, {parent_context}, {operation_mode}",
-                            foreground="#888888")
-        info_label.pack(anchor=tk.W, pady=(0, 10))
-        
-        # Add Save/Load buttons at top
-        action_frame = ttk.Frame(main_frame)
-        action_frame.pack(fill=tk.X, pady=(0, 10))
-        
-        ttk.Button(action_frame, text="Load from File", 
-                command=self.load_master_prompt).pack(side=tk.LEFT, padx=(0, 5))
-        ttk.Button(action_frame, text="Save to File", 
-                command=self.save_master_prompt).pack(side=tk.LEFT)
-        
-        text_frame = ttk.Frame(main_frame)
-        text_frame.pack(fill=tk.BOTH, expand=True)
-        
-        prompt_text = scrolledtext.ScrolledText(text_frame, height=20, width=80,
-                                            bg="#1e1e1e", fg="#ffffff",
-                                            font=("Consolas", 10), wrap=tk.WORD)
-        prompt_text.pack(fill=tk.BOTH, expand=True)
-        prompt_text.insert('1.0', self.master_prompt.get())
-        
-        btn_frame = ttk.Frame(main_frame)
-        btn_frame.pack(fill=tk.X, pady=(10, 0))
-        
-        prompt_text.config(insertbackground="#ffffff")  # White cursor
-        prompt_text.config(selectbackground="#3a5f8f")  # Blue selection background
-        prompt_text.config(selectforeground="#ffffff")  # White selection text
-        
-        def save_prompt():
-            self.master_prompt.set(prompt_text.get('1.0', tk.END).strip())
-            self.log_message("Master prompt updated")
-            editor_window.destroy()
-        
-        def reset_prompt():
-            if messagebox.askyesno("Reset", "Reset to default prompt?"):
-                self.set_default_prompt()
-                prompt_text.delete('1.0', tk.END)
-                prompt_text.insert('1.0', self.master_prompt.get())
-        
-        ttk.Button(btn_frame, text="Reset to Default", command=reset_prompt).pack(side=tk.LEFT)
-        ttk.Button(btn_frame, text="Cancel", command=editor_window.destroy).pack(side=tk.RIGHT)
-        ttk.Button(btn_frame, text="Save", command=save_prompt).pack(side=tk.RIGHT, padx=(0, 5))
-
     def open_prompt_manager(self):
         """Consolidated prompt manager - edit master prompt & manage library"""
         # Prevent duplicate modal
@@ -3887,10 +3937,12 @@ Rewritten text with consistent {target_tense} tense:"""
         list_btn_frame = ttk.Frame(left_frame)
         list_btn_frame.pack(fill=tk.X, pady=(5, 0))
 
+        ttk.Button(list_btn_frame, text="Add New",
+                command=lambda: self._pm_add_new_prompt(prompt_list, prompt_text, master_indicator)).pack(fill=tk.X, pady=(0, 3))
         ttk.Button(list_btn_frame, text="Import",
-                command=lambda: self._pm_import_prompt(prompt_list, prompt_text, master_indicator)).pack(side=tk.LEFT, padx=(0, 5))
+                command=lambda: self._pm_import_prompt(prompt_list, prompt_text, master_indicator)).pack(fill=tk.X, pady=(0, 3))
         ttk.Button(list_btn_frame, text="Remove",
-                command=lambda: self._pm_remove_prompt(prompt_list, prompt_text, master_indicator)).pack(side=tk.LEFT)
+                command=lambda: self._pm_remove_prompt(prompt_list, prompt_text, master_indicator)).pack(fill=tk.X)
 
         # Right panel - prompt editor
         right_frame = ttk.Frame(pane)
@@ -4070,6 +4122,61 @@ Rewritten text with consistent {target_tense} tense:"""
 
         except Exception as e:
             messagebox.showerror("Error", f"Failed to set master: {str(e)}")
+
+    def _pm_add_new_prompt(self, listbox, text_widget, indicator):
+        """Create a new blank prompt with user-specified name and location"""
+        try:
+            # Ask for prompt name
+            name = tk.simpledialog.askstring("New Prompt", "Enter a name for the new prompt:")
+
+            if not name:
+                return
+
+            # Clean up name
+            clean_name = name.replace('.txt', '')
+
+            # Ask for save location
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            library_dir = os.path.join(script_dir, "prompt_library")
+
+            if not os.path.exists(library_dir):
+                os.makedirs(library_dir)
+
+            # Prompt for save location
+            file_path = filedialog.asksaveasfilename(
+                title="Save New Prompt",
+                initialdir=library_dir,
+                initialfile=clean_name + ".txt",
+                defaultextension=".txt",
+                filetypes=[("Text files", "*.txt"), ("All files", "*.*")]
+            )
+
+            if not file_path:
+                return
+
+            # Create empty prompt file
+            with open(file_path, 'w', encoding='utf-8') as f:
+                f.write("")
+
+            self.log_message(f"New prompt created: {os.path.basename(file_path)}")
+
+            # Reload library and select new prompt
+            self._pm_load_library(listbox, text_widget, indicator)
+
+            # Find and select the newly created prompt
+            filename = os.path.basename(file_path)
+            display_name = os.path.splitext(filename)[0]
+            for i in range(listbox.size()):
+                item = listbox.get(i).replace("⭐ ", "")
+                if item == display_name:
+                    listbox.selection_clear(0, tk.END)
+                    listbox.selection_set(i)
+                    listbox.see(i)
+                    self._pm_on_select(listbox, text_widget, indicator)
+                    break
+
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to create new prompt: {str(e)}")
 
     def _pm_save_to_library(self, listbox, text_widget, indicator):
         """Save current text as a new prompt in library"""
