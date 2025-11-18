@@ -1114,11 +1114,13 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
 
             # Create knowledge collections list with minimal info
             saved_collections = []
-            for col in self.selected_knowledge_collections:
-                saved_collections.append({
-                    'id': col['id'],
-                    'name': col['name']
-                })
+            if self.selected_knowledge_collections and isinstance(self.selected_knowledge_collections, list):
+                for col in self.selected_knowledge_collections:
+                    if isinstance(col, dict) and 'id' in col and 'name' in col:
+                        saved_collections.append({
+                            'id': col['id'],
+                            'name': col['name']
+                        })
 
             # Try to save to encrypted credentials if available
             if self.credential_manager and self.credential_manager.is_encrypted:
@@ -1298,12 +1300,14 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
                 
                 # Create knowledge collections list with minimal info
                 saved_collections = []
-                for col in self.selected_knowledge_collections:
-                    saved_collections.append({
-                        'id': col['id'],
-                        'name': col['name']
-                    })
-                
+                if self.selected_knowledge_collections and isinstance(self.selected_knowledge_collections, list):
+                    for col in self.selected_knowledge_collections:
+                        if isinstance(col, dict) and 'id' in col and 'name' in col:
+                            saved_collections.append({
+                                'id': col['id'],
+                                'name': col['name']
+                            })
+
                 config = {
                     'base_url': self.openwebui_base_url,
                     'api_key': self.openwebui_api_key,
@@ -3259,9 +3263,10 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
                 prompt += "Your task: Add additional relevant content."
 
             # Add knowledge base instruction
-            if self.selected_knowledge_collections:
-                collection_names = [col['name'] for col in self.selected_knowledge_collections]
-                prompt += f"\n\nIMPORTANT: Reference knowledge base: {', '.join(collection_names)}"
+            if self.selected_knowledge_collections and isinstance(self.selected_knowledge_collections, list):
+                collection_names = [col['name'] for col in self.selected_knowledge_collections if isinstance(col, dict) and 'name' in col]
+                if collection_names:
+                    prompt += f"\n\nIMPORTANT: Reference knowledge base: {', '.join(collection_names)}"
 
             # NEW: Add external RAG content if available
             external_content = self.get_external_rag_content()
@@ -3354,10 +3359,11 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
                 "max_tokens": self.max_tokens.get()
             }
 
-            if self.selected_knowledge_collections:
+            if self.selected_knowledge_collections and isinstance(self.selected_knowledge_collections, list):
                 payload["files"] = [
                     {"type": "collection", "id": col['id']}
                     for col in self.selected_knowledge_collections
+                    if isinstance(col, dict) and 'id' in col
                 ]
 
             response = requests.post(
@@ -3430,10 +3436,11 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
                 "max_tokens": self.max_tokens.get()
             }
 
-            if self.selected_knowledge_collections:
+            if self.selected_knowledge_collections and isinstance(self.selected_knowledge_collections, list):
                 payload["files"] = [
                     {"type": "collection", "id": col['id']}
                     for col in self.selected_knowledge_collections
+                    if isinstance(col, dict) and 'id' in col
                 ]
 
             response = requests.post(
