@@ -946,15 +946,45 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
         self.commit_btn.config(state=tk.NORMAL)
 
     def load_settings(self, config_file=None):
-        """Load saved settings"""
+        """Load saved settings - tries encrypted credentials first, then JSON config"""
         try:
             script_dir = os.path.dirname(os.path.abspath(__file__))
-            
-            # Use provided config file or default
+
+            # Try to load encrypted credentials first
+            if self.credential_manager:
+                try:
+                    self.update_status("Loading credentials...")
+                    if self.credential_manager.load_credentials(self.root):
+                        self.update_status("Loading credentials from encrypted store...")
+                        creds = self.credential_manager.get_all_credentials()
+
+                        # Load OpenWebUI settings from encrypted credentials
+                        if 'openwebui' in creds:
+                            ow = creds['openwebui']
+                            self.openwebui_base_url = ow.get('base_url', 'http://172.16.27.122:3000')
+                            self.openwebui_api_key = ow.get('api_key', '')
+                            self.selected_model.set(ow.get('default_model', ''))
+                            self.temperature.set(ow.get('temperature', 0.1))
+                            self.max_tokens.set(ow.get('max_tokens', 8000))
+
+                            # Load knowledge collections from encrypted credentials
+                            if 'knowledge_collections' in ow:
+                                self.selected_knowledge_collections = ow.get('knowledge_collections', [])
+
+                        self.update_status("Credentials loaded successfully")
+                        print("✓ Loaded settings from encrypted credentials")
+                        # Skip loading from JSON if credentials were loaded
+                        return
+                except Exception as e:
+                    print(f"Note: Could not load encrypted credentials: {e}")
+                    self.update_status("Using default configuration")
+
+            # Fall back to JSON config if no encrypted credentials
             if not config_file:
                 config_file = os.path.join(script_dir, "openwebui_config.json")
-            
+
             if os.path.exists(config_file):
+                self.update_status("Loading configuration from file...")
                 with open(config_file, 'r') as f:
                     config = json.load(f)
                     self.openwebui_base_url = config.get('base_url', 'http://172.16.27.122:3000')
@@ -962,15 +992,15 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
                     self.selected_model.set(config.get('model', ''))
                     self.temperature.set(config.get('temperature', 0.1))
                     self.max_tokens.set(config.get('max_tokens', 8000))
-                    
+
                     # Load RAG knowledge collections
                     if 'knowledge_collections' in config:
                         self.selected_knowledge_collections = config['knowledge_collections']
-                    
+
                     # Load master prompt
                     if 'master_prompt' in config:
                         self.master_prompt.set(config.get('master_prompt'))
-                    
+
                     if 'format_config' in config:
                         fmt = config['format_config']
                         self.format_config['highlight_enabled'].set(fmt.get('highlight_enabled', True))
@@ -980,7 +1010,7 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
                         self.format_config['underline_enabled'].set(fmt.get('underline_enabled', False))
                         self.format_config['font_color'].set(fmt.get('font_color', '000000'))
                         self.format_config['font_size'].set(fmt.get('font_size', 11))
-                    
+
                     if 'auto_config' in config:
                         auto = config['auto_config']
                         self.auto_config['auto_backup'].set(auto.get('auto_backup', True))
@@ -988,21 +1018,24 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
                         self.auto_config['auto_save'].set(auto.get('auto_save', False))
                         self.auto_config['auto_reload'].set(auto.get('auto_reload', True))
                         self.auto_config['ask_backup'].set(auto.get('ask_backup', True))
-            
+                self.update_status("Configuration loaded from file")
+
             last_doc_file = os.path.join(script_dir, "last_document.txt")
             if os.path.exists(last_doc_file):
                 with open(last_doc_file, 'r') as f:
                     self.last_document_path = f.read().strip()
-                    
+
+            self.update_status("Ready")
+
         except Exception as e:
             print(f"Note: Could not load settings: {str(e)}")
+            self.update_status("Using default settings")
 
     def save_settings(self):
-        """Save current settings"""
+        """Save current settings - to encrypted credentials if available, otherwise JSON"""
         try:
             script_dir = os.path.dirname(os.path.abspath(__file__))
-            config_file = os.path.join(script_dir, "openwebui_config.json")
-            
+
             # Create knowledge collections list with minimal info
             saved_collections = []
             for col in self.selected_knowledge_collections:
@@ -1010,7 +1043,45 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
                     'id': col['id'],
                     'name': col['name']
                 })
-            
+
+            # Try to save to encrypted credentials if available
+            if self.credential_manager and self.credential_manager.is_encrypted:
+                try:
+                    self.update_status("Saving to encrypted credentials...")
+
+                    # Update credentials with current settings
+                    self.credential_manager.set_credential('openwebui', 'base_url', self.openwebui_base_url)
+                    self.credential_manager.set_credential('openwebui', 'api_key', self.openwebui_api_key)
+                    self.credential_manager.set_credential('openwebui', 'default_model', self.selected_model.get())
+                    self.credential_manager.set_credential('openwebui', 'temperature', self.temperature.get())
+                    self.credential_manager.set_credential('openwebui', 'max_tokens', self.max_tokens.get())
+                    self.credential_manager.set_credential('openwebui', 'knowledge_collections', saved_collections)
+                    self.credential_manager.set_credential('openwebui', 'last_used', datetime.now().isoformat())
+
+                    # Prompt for password to save
+                    from tkinter import simpledialog
+                    password = simpledialog.askstring(
+                        "Save Credentials",
+                        "Enter password to save encrypted credentials:",
+                        show='*',
+                        parent=self.root
+                    )
+
+                    if password:
+                        if self.credential_manager.save_credentials(password):
+                            self.update_status("Settings saved to encrypted credentials")
+                            print("✓ Settings saved to encrypted credentials")
+                            return
+                    else:
+                        self.update_status("Save cancelled")
+                        return
+                except Exception as e:
+                    print(f"Note: Could not save to encrypted credentials: {e}")
+                    self.update_status("Saving to JSON config instead...")
+
+            # Fall back to JSON config
+            config_file = os.path.join(script_dir, "openwebui_config.json")
+
             config = {
                 'base_url': self.openwebui_base_url,
                 'api_key': self.openwebui_api_key,
@@ -1036,14 +1107,16 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
                     'ask_backup': self.auto_config['ask_backup'].get()
                 }
             }
-            
+
             with open(config_file, 'w') as f:
                 json.dump(config, f, indent=2)
-                
+
             if self.document_path:
                 last_doc_file = os.path.join(script_dir, "last_document.txt")
                 with open(last_doc_file, 'w') as f:
                     f.write(self.document_path)
+
+            self.update_status("Settings saved")
                     
             self.log_message("Settings saved")
             
@@ -2121,33 +2194,41 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
     def load_document(self, filepath):
         """Load Word document and parse sections"""
         try:
+            self.update_status(f"Loading document...")
             self.log_message(f"Loading document: {filepath}")
             self.document = Document(filepath)
             self.document_path = filepath
             self.doc_label_var.set(os.path.basename(filepath))
-            
+
             # Enable reload button since document is now loaded
             self.reload_btn.config(state=tk.NORMAL)
-            
+
+            self.update_status("Loading section tracking...")
             # Load section tracking
             self.load_section_tracking()
-            
+
+            self.update_status("Parsing document structure...")
             # Parse document structure
             self.parse_document_structure()
-            
+
+            self.update_status("Populating section tree...")
             # Populate tree
             self.populate_tree()
-            
+
+            self.update_status("Saving settings...")
             # Save as last document
             self.save_settings()
-            
+
             self.log_message(f"Document loaded: {len(self.sections)} sections found")
-            
+            self.update_status(f"Document loaded: {len(self.sections)} sections")
+
         except PermissionError:
             self.log_message("Error: File is open in another application")
+            self.update_status("Error: File is open in another application")
             messagebox.showerror("Error", "File is open. Please close it and try again.")
         except Exception as e:
             self.log_message(f"Error loading document: {str(e)}")
+            self.update_status(f"Error loading document")
             messagebox.showerror("Error", f"Failed to load document: {str(e)}")
     
     def reload_document_wrapper(self):
@@ -3057,17 +3138,19 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
         thread.start()
         
     def generate_content_thread(self):
-        """Generate content in background thread"""
+        """Generate content in background thread with streaming"""
         try:
             self.generate_btn.config(state='disabled')
-            
+            self.root.after(0, lambda: self.update_status(f"Preparing to generate content..."))
+
             section = self.selected_section
             mode = self.operation_mode.get()
             existing_content = section.get_existing_content()
-            
+
             self.log_message(f"Generating content for: {section.get_full_path()}")
             self.log_message(f"Mode: {mode}")
-            
+            self.root.after(0, lambda: self.update_status(f"Building prompt for {section.text}..."))
+
             # Build parent context
             parent_context = ""
             if section.parent:
@@ -3077,13 +3160,13 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
                     parent_path.insert(0, current.text)
                     current = current.parent
                 parent_context = " > ".join(parent_path)
-            
+
             # Build prompt
             prompt = self.master_prompt.get()
             prompt = prompt.replace("{section_name}", section.text)
             prompt = prompt.replace("{parent_context}", parent_context if parent_context else "Root level")
             prompt = prompt.replace("{operation_mode}", mode.upper())
-            
+
             # Add mode-specific instructions
             if mode == "replace":
                 prompt += "\n\nYour task: Write comprehensive content for this section from scratch."
@@ -3093,7 +3176,7 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
             elif mode == "append":
                 prompt += f"\n\nEXISTING CONTENT:\n{existing_content}\n\n"
                 prompt += "Your task: Add additional relevant content."
-            
+
             # Add knowledge base instruction
             if self.selected_knowledge_collections:
                 collection_names = [col['name'] for col in self.selected_knowledge_collections]
@@ -3102,6 +3185,7 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
             # NEW: Add external RAG content if available
             external_content = self.get_external_rag_content()
             if external_content:
+                self.root.after(0, lambda: self.update_status("Adding external RAG content..."))
                 prompt += "\n\n" + "="*60 + "\n"
                 prompt += "ADDITIONAL REFERENCE CONTENT (External RAG):\n"
                 prompt += "="*60 + "\n"
@@ -3115,22 +3199,37 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
 
             # Store the prompt
             self.last_sent_prompt = prompt
-            
+
             self.log_message("Sending request to OpenWebUI...")
-            
-            # Query OpenWebUI
-            response = self.query_openwebui(prompt)
-            
+            self.root.after(0, lambda: self.update_status("Sending request to OpenWebUI..."))
+
+            # Initialize generated content
+            self.generated_content = ""
+
+            # Define streaming callback to update preview in real-time
+            def on_chunk(chunk):
+                """Handle each streaming chunk"""
+                self.generated_content += chunk
+                # Update preview in real-time
+                self.root.after(0, self.show_generated_content)
+                self.root.after(0, lambda: self.update_status("Receiving response..."))
+
+            # Query OpenWebUI with streaming
+            response = self.query_openwebui_streaming(prompt, callback=on_chunk)
+
             if response and not response.startswith("Error:"):
                 self.generated_content = response
                 self.root.after(0, self.show_generated_content)
+                self.root.after(0, lambda: self.update_status("Content generated successfully"))
                 self.log_message("Content generated successfully")
             else:
                 self.log_message(f"Generation failed: {response}")
+                self.root.after(0, lambda: self.update_status(f"Generation failed"))
                 self.root.after(0, self.handle_generation_error)
-                
+
         except Exception as e:
             self.log_message(f"Error generating content: {str(e)}")
+            self.root.after(0, lambda: self.update_status(f"Error: {str(e)}"))
             self.root.after(0, self.handle_generation_error)
         finally:
             self.root.after(0, lambda: self.generate_btn.config(state='normal'))
@@ -4225,14 +4324,14 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
         """Commit generated content to document"""
         if not self.selected_section or not self.document:
             return
-            
+
         # Get edited content from preview (without formatting tags)
         content_to_commit = self.generated_text.get('1.0', tk.END).strip()
-        
+
         if not content_to_commit:
             messagebox.showwarning("Warning", "No content to commit")
             return
-        
+
         # Confirm commit
         result = messagebox.askyesno(
             "Commit Content",
@@ -4240,53 +4339,65 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
             f"Mode: {self.operation_mode.get().upper()}\n\n"
             "This will modify the document."
         )
-        
+
         if not result:
             return
-        
+
         try:
+            self.update_status("Preparing to commit content...")
+
             # Check if backup is needed
             if self.auto_config['ask_backup'].get():
+                self.update_status("Waiting for backup decision...")
                 self.prompt_for_backup()
             else:
+                self.update_status("Creating backup...")
                 self.create_backup()
-            
+
             # Apply content based on mode
             mode = self.operation_mode.get()
             section = self.selected_section
-            
+
+            self.update_status(f"Committing content to {section.text}...")
+
             if mode == "replace":
                 self.replace_section_content(section, content_to_commit)
             elif mode == "rework":
                 self.replace_section_content(section, content_to_commit)
             elif mode == "append":
                 self.append_section_content(section, content_to_commit)
-            
+
             # Mark section as edited
             self.mark_section_edited(section)
-            
+
+            self.update_status("Refreshing section tree...")
             # Refresh tree
             self.populate_tree()
-            
+
             # Auto-save if enabled
             if self.auto_config['auto_save'].get():
+                self.update_status("Auto-saving document...")
                 self.save_document_auto()
             else:
+                self.update_status("Prompting to save...")
                 self.prompt_save_document()
-            
+
             # Clear preview
             self.clear_preview()
-            
+
             # Auto-reload if enabled
             if self.auto_config['auto_reload'].get():
+                self.update_status("Auto-reloading document...")
                 self.reload_document()
             else:
                 self.show_existing_content()
-            
+
             self.log_message(f"Content committed to: {section.text}")
-            
+            self.update_status(f"Content committed to {section.text}")
+
         except Exception as e:
             self.log_message(f"Error committing content: {str(e)}")
+            self.update_status(f"Error committing content")
             messagebox.showerror("Error", f"Failed to commit content: {str(e)}")
     
     def prompt_for_backup(self):
