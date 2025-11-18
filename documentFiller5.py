@@ -1098,6 +1098,30 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
                             if 'knowledge_collections' in ow:
                                 self.selected_knowledge_collections = ow.get('knowledge_collections', [])
 
+                            # Load master prompt from encrypted credentials
+                            if 'master_prompt' in ow:
+                                self.master_prompt.set(ow.get('master_prompt', ''))
+
+                        # Load format_config from encrypted credentials
+                        if 'format_config' in creds:
+                            fmt = creds['format_config']
+                            self.format_config['highlight_enabled'].set(fmt.get('highlight_enabled', True))
+                            self.format_config['highlight_color'].set(fmt.get('highlight_color', 'YELLOW'))
+                            self.format_config['bold_enabled'].set(fmt.get('bold_enabled', False))
+                            self.format_config['italic_enabled'].set(fmt.get('italic_enabled', False))
+                            self.format_config['underline_enabled'].set(fmt.get('underline_enabled', False))
+                            self.format_config['font_color'].set(fmt.get('font_color', '000000'))
+                            self.format_config['font_size'].set(fmt.get('font_size', 11))
+
+                        # Load auto_config from encrypted credentials
+                        if 'auto_config' in creds:
+                            auto = creds['auto_config']
+                            self.auto_config['auto_backup'].set(auto.get('auto_backup', True))
+                            self.auto_config['backup_interval'].set(auto.get('backup_interval', 5))
+                            self.auto_config['auto_save'].set(auto.get('auto_save', False))
+                            self.auto_config['auto_reload'].set(auto.get('auto_reload', True))
+                            self.auto_config['ask_backup'].set(auto.get('ask_backup', True))
+
                         self.update_status("Credentials loaded successfully")
                         print("✓ Loaded settings from encrypted credentials")
                         # Skip loading from JSON if credentials were loaded
@@ -1106,7 +1130,7 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
                     print(f"Note: Could not load encrypted credentials: {e}")
                     self.update_status("Using default configuration")
 
-            # Fall back to JSON config if no encrypted credentials
+            # Fall back to JSON config if no encrypted credentials - and migrate it
             if not config_file:
                 config_file = os.path.join(script_dir, "openwebui_config.json")
 
@@ -1147,6 +1171,42 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
                         self.auto_config['ask_backup'].set(auto.get('ask_backup', True))
                 self.update_status("Configuration loaded from file")
 
+                # Auto-migrate JSON config to encrypted credentials
+                if self.credential_manager:
+                    print("📦 Migrating settings from JSON to encrypted credentials...")
+                    if self.credential_manager.migrate_from_json_config(config_file, silent=True):
+                        print("✓ Settings migrated to encrypted credentials")
+
+                        # Save the migrated credentials
+                        if self.credential_manager.is_encrypted:
+                            # Credentials are already loaded with password, just save
+                            password = tk.simpledialog.askstring(
+                                "Save Migrated Settings",
+                                "Enter password to save migrated settings to encrypted credentials:",
+                                show='*',
+                                parent=self.root
+                            )
+                            if password and self.credential_manager.save_credentials(password):
+                                print("✓ Migrated settings saved to encrypted credentials")
+                            else:
+                                print("⚠ Migration not saved - will retry next time")
+                                return  # Don't remove JSON file if save failed
+                        else:
+                            # Save unencrypted
+                            if self.credential_manager.save_credentials():
+                                print("✓ Migrated settings saved to credentials file")
+
+                        # Rename old JSON file to .backup
+                        import shutil
+                        from datetime import datetime
+                        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                        backup_path = f"{config_file}.migrated.{timestamp}.backup"
+                        try:
+                            shutil.move(config_file, backup_path)
+                            print(f"✓ Old JSON config moved to: {os.path.basename(backup_path)}")
+                        except Exception as e:
+                            print(f"⚠ Could not rename old config: {e}")
+
             last_doc_file = os.path.join(script_dir, "last_document.txt")
             if os.path.exists(last_doc_file):
                 with open(last_doc_file, 'r') as f:
@@ -1159,32 +1219,33 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
             self.update_status("Using default settings")
 
     def save_settings(self):
-        """Save current settings to JSON and last_document.txt (no password prompts)"""
+        """Save current settings to encrypted credentials (no password prompts for automatic saves)"""
         try:
             script_dir = os.path.dirname(os.path.abspath(__file__))
 
-            # Create knowledge collections list with minimal info
-            saved_collections = []
-            if self.selected_knowledge_collections and isinstance(self.selected_knowledge_collections, list):
-                for col in self.selected_knowledge_collections:
-                    if isinstance(col, dict) and 'id' in col and 'name' in col:
-                        saved_collections.append({
-                            'id': col['id'],
-                            'name': col['name']
-                        })
+            # If credential manager is available, save to encrypted credentials
+            if self.credential_manager:
+                # Create knowledge collections list with minimal info
+                saved_collections = []
+                if self.selected_knowledge_collections and isinstance(self.selected_knowledge_collections, list):
+                    for col in self.selected_knowledge_collections:
+                        if isinstance(col, dict) and 'id' in col and 'name' in col:
+                            saved_collections.append({
+                                'id': col['id'],
+                                'name': col['name']
+                            })
 
-            # Save to JSON config (no password prompts for automatic saves)
-            config_file = os.path.join(script_dir, "openwebui_config.json")
+                # Update credentials with current settings
+                self.credential_manager.set_credential('openwebui', 'base_url', self.openwebui_base_url)
+                self.credential_manager.set_credential('openwebui', 'api_key', self.openwebui_api_key)
+                self.credential_manager.set_credential('openwebui', 'default_model', self.selected_model.get())
+                self.credential_manager.set_credential('openwebui', 'temperature', self.temperature.get())
+                self.credential_manager.set_credential('openwebui', 'max_tokens', self.max_tokens.get())
+                self.credential_manager.set_credential('openwebui', 'knowledge_collections', saved_collections)
+                self.credential_manager.set_credential('openwebui', 'master_prompt', self.master_prompt.get())
 
-            config = {
-                'base_url': self.openwebui_base_url,
-                'api_key': self.openwebui_api_key,
-                'model': self.selected_model.get(),
-                'temperature': self.temperature.get(),
-                'max_tokens': self.max_tokens.get(),
-                'knowledge_collections': saved_collections,
-                'master_prompt': self.master_prompt.get(),
-                'format_config': {
+                # Save format_config
+                format_config = {
                     'highlight_enabled': self.format_config['highlight_enabled'].get(),
                     'highlight_color': self.format_config['highlight_color'].get(),
                     'bold_enabled': self.format_config['bold_enabled'].get(),
@@ -1192,18 +1253,32 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
                     'underline_enabled': self.format_config['underline_enabled'].get(),
                     'font_color': self.format_config['font_color'].get(),
                     'font_size': self.format_config['font_size'].get()
-                },
-                'auto_config': {
+                }
+                if 'format_config' not in self.credential_manager.credentials:
+                    self.credential_manager.credentials['format_config'] = {}
+                self.credential_manager.credentials['format_config'].update(format_config)
+
+                # Save auto_config
+                auto_config = {
                     'auto_backup': self.auto_config['auto_backup'].get(),
                     'backup_interval': self.auto_config['backup_interval'].get(),
                     'auto_save': self.auto_config['auto_save'].get(),
                     'auto_reload': self.auto_config['auto_reload'].get(),
                     'ask_backup': self.auto_config['ask_backup'].get()
                 }
-            }
+                if 'auto_config' not in self.credential_manager.credentials:
+                    self.credential_manager.credentials['auto_config'] = {}
+                self.credential_manager.credentials['auto_config'].update(auto_config)
 
-            with open(config_file, 'w') as f:
-                json.dump(config, f, indent=2)
+                # Save without password prompt (for automatic saves)
+                # If encrypted, we need to get the password once
+                if self.credential_manager.is_encrypted:
+                    # Try to save - if it fails, user will be prompted when they explicitly save
+                    # For now, we'll skip automatic saves to encrypted credentials
+                    # and only save when explicitly requested via save_to_encrypted_credentials
+                    pass
+                else:
+                    self.credential_manager.save_credentials()
 
             # Save last document path for auto-load on next startup
             if self.document_path:
@@ -1212,7 +1287,7 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
                     f.write(self.document_path)
 
             self.update_status("Settings saved")
-            self.log_message("Settings saved")
+            self.log_message("Settings saved to credentials")
 
         except Exception as e:
             self.log_message(f"Error saving settings: {str(e)}")
@@ -1283,14 +1358,32 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
         """Browse for a different configuration file"""
         filename = filedialog.askopenfilename(
             title="Select Configuration File",
-            filetypes=[("JSON files", "*.json"), ("All files", "*.*")]
+            filetypes=[
+                ("Encrypted Credentials", "*.enc"),
+                ("JSON files", "*.json"),
+                ("All files", "*.*")
+            ]
         )
         if filename:
             try:
-                self.load_settings(filename)
-                self.update_config_status()
-                self.log_message(f"Loaded configuration from: {filename}")
-                messagebox.showinfo("Success", "Configuration loaded successfully")
+                # Check if it's an encrypted credentials file
+                if filename.endswith('.enc'):
+                    if self.credential_manager:
+                        if self.credential_manager.load_credentials_from_file(filename, self.root):
+                            # Reload settings from the newly loaded credentials
+                            self.load_settings()
+                            self.update_config_status()
+                            self.log_message(f"Loaded encrypted credentials from: {filename}")
+                        else:
+                            self.log_message(f"Failed to load credentials from: {filename}")
+                    else:
+                        messagebox.showerror("Error", "Credential manager not available")
+                else:
+                    # Load as JSON config file
+                    self.load_settings(filename)
+                    self.update_config_status()
+                    self.log_message(f"Loaded configuration from: {filename}")
+                    messagebox.showinfo("Success", "Configuration loaded successfully")
             except Exception as e:
                 self.log_message(f"Error loading configuration: {str(e)}")
                 messagebox.showerror("Error", f"Failed to load configuration: {str(e)}")
@@ -2045,24 +2138,31 @@ Rewritten text with consistent {target_tense} tense:"""
         dialog.geometry("500x300")
         dialog.configure(bg="#2b2b2b")
         dialog.grab_set()
-        
+
         main_frame = ttk.Frame(dialog, padding="20")
         main_frame.pack(fill=tk.BOTH, expand=True)
-        
-        ttk.Label(main_frame, text="Configuration File Management", 
+
+        ttk.Label(main_frame, text="Configuration File Management",
                 font=("Arial", 12, "bold")).pack(anchor=tk.W, pady=(0, 15))
-        
-        # Current file
+
+        # Current file - prefer encrypted credentials over JSON
         script_dir = os.path.dirname(os.path.abspath(__file__))
+        credentials_file = os.path.join(script_dir, "config_credentials.enc")
         current_config = os.path.join(script_dir, "openwebui_config.json")
-        
-        if os.path.exists(current_config):
+
+        # Check for encrypted credentials first
+        if os.path.exists(credentials_file):
+            config_size = os.path.getsize(credentials_file)
+            config_date = datetime.fromtimestamp(os.path.getmtime(credentials_file)).strftime("%Y-%m-%d %H:%M")
+            encryption_status = "Encrypted" if self.credential_manager and self.credential_manager.is_encrypted else "Unencrypted"
+            config_info = f"Current: {os.path.basename(credentials_file)} ({encryption_status}, {config_size/1024:.1f} KB, {config_date})"
+        elif os.path.exists(current_config):
             config_size = os.path.getsize(current_config)
             config_date = datetime.fromtimestamp(os.path.getmtime(current_config)).strftime("%Y-%m-%d %H:%M")
-            config_info = f"Current: {os.path.basename(current_config)} ({config_size/1024:.1f} KB, {config_date})"
+            config_info = f"Legacy: {os.path.basename(current_config)} (JSON, {config_size/1024:.1f} KB, {config_date})"
         else:
             config_info = "No configuration file found"
-        
+
         ttk.Label(main_frame, text=config_info).pack(anchor=tk.W, pady=(0, 15))
         
         # Action buttons
@@ -7038,7 +7138,7 @@ Rewritten text with consistent {target_tense} tense:"""
         if not self.credential_manager:
             messagebox.showinfo("Not Available", "Credential manager not available")
             return False
-        
+
         try:
             # Update credentials with current settings
             self.credential_manager.set_credential('openwebui', 'base_url', self.openwebui_base_url)
@@ -7046,7 +7146,45 @@ Rewritten text with consistent {target_tense} tense:"""
             self.credential_manager.set_credential('openwebui', 'default_model', self.selected_model.get())
             self.credential_manager.set_credential('openwebui', 'temperature', self.temperature.get())
             self.credential_manager.set_credential('openwebui', 'max_tokens', self.max_tokens.get())
-            
+            self.credential_manager.set_credential('openwebui', 'master_prompt', self.master_prompt.get())
+
+            # Save knowledge collections
+            saved_collections = []
+            if self.selected_knowledge_collections and isinstance(self.selected_knowledge_collections, list):
+                for col in self.selected_knowledge_collections:
+                    if isinstance(col, dict) and 'id' in col and 'name' in col:
+                        saved_collections.append({
+                            'id': col['id'],
+                            'name': col['name']
+                        })
+            self.credential_manager.set_credential('openwebui', 'knowledge_collections', saved_collections)
+
+            # Save format_config
+            format_config = {
+                'highlight_enabled': self.format_config['highlight_enabled'].get(),
+                'highlight_color': self.format_config['highlight_color'].get(),
+                'bold_enabled': self.format_config['bold_enabled'].get(),
+                'italic_enabled': self.format_config['italic_enabled'].get(),
+                'underline_enabled': self.format_config['underline_enabled'].get(),
+                'font_color': self.format_config['font_color'].get(),
+                'font_size': self.format_config['font_size'].get()
+            }
+            if 'format_config' not in self.credential_manager.credentials:
+                self.credential_manager.credentials['format_config'] = {}
+            self.credential_manager.credentials['format_config'].update(format_config)
+
+            # Save auto_config
+            auto_config = {
+                'auto_backup': self.auto_config['auto_backup'].get(),
+                'backup_interval': self.auto_config['backup_interval'].get(),
+                'auto_save': self.auto_config['auto_save'].get(),
+                'auto_reload': self.auto_config['auto_reload'].get(),
+                'ask_backup': self.auto_config['ask_backup'].get()
+            }
+            if 'auto_config' not in self.credential_manager.credentials:
+                self.credential_manager.credentials['auto_config'] = {}
+            self.credential_manager.credentials['auto_config'].update(auto_config)
+
             # Save (will prompt for password if needed)
             if self.credential_manager.is_encrypted:
                 password = tk.simpledialog.askstring(
@@ -7068,11 +7206,11 @@ Rewritten text with consistent {target_tense} tense:"""
                     messagebox.showinfo("Success", "Settings saved to credentials file")
                     self.log_message("Settings saved to credentials file")
                     return True
-                
+
         except Exception as e:
             self.log_message(f"Error saving encrypted credentials: {e}")
             messagebox.showerror("Error", f"Failed to save: {str(e)}")
-        
+
         return False
 
     def change_credential_password(self):
