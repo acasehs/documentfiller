@@ -1696,6 +1696,49 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
             messagebox.showerror("Analysis Error", f"Failed to analyze tenses: {str(e)}")
             self.log_message(f"Tense analysis error: {e}")
 
+    def _correct_section_tenses(self, target_tense):
+        """Correct section tenses using AI"""
+        try:
+            self.log_message(f"Correcting tenses to {target_tense}...")
+
+            content = self.selected_section.get_existing_content()
+
+            prompt = f"""Rewrite the following text to use consistent {target_tense} tense throughout.
+
+Maintain:
+- All factual information and technical details
+- Document structure and formatting
+- Overall meaning and intent
+- Markdown formatting (bold, italics, etc.)
+
+Only change:
+- Verb tenses to {target_tense} tense
+- Related time expressions as needed
+
+Original text:
+{content}
+
+Rewritten text with consistent {target_tense} tense:"""
+
+            self.log_message("Sending tense correction request to AI...")
+            corrected_content = self.query_openwebui(prompt)
+
+            if corrected_content and not corrected_content.startswith("Error:"):
+                self.generated_content = corrected_content
+                self.show_generated_content()
+                self.notebook.select(0)
+                self.log_message("✓ Tense correction completed - review in preview")
+                messagebox.showinfo("Success",
+                    f"Content corrected to {target_tense} tense.\n\n"
+                    "Review the changes in the preview and commit if acceptable.")
+            else:
+                self.log_message(f"Tense correction failed: {corrected_content}")
+                messagebox.showerror("Error", f"Failed to correct tenses: {corrected_content}")
+
+        except Exception as e:
+            self.log_message(f"Error correcting tenses: {e}")
+            messagebox.showerror("Error", f"Failed to correct tenses: {str(e)}")
+
     def show_processing_strategy_dialog(self):
         """NEW FEATURE: Display content processing strategy analysis"""
         if not self.content_processor:
@@ -6602,6 +6645,49 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
             messagebox.showerror("Analysis Error", f"Failed to analyze tenses: {str(e)}")
             self.log_message(f"Tense analysis error: {e}")
 
+    def _correct_section_tenses(self, target_tense):
+        """Correct section tenses using AI"""
+        try:
+            self.log_message(f"Correcting tenses to {target_tense}...")
+
+            content = self.selected_section.get_existing_content()
+
+            prompt = f"""Rewrite the following text to use consistent {target_tense} tense throughout.
+
+Maintain:
+- All factual information and technical details
+- Document structure and formatting
+- Overall meaning and intent
+- Markdown formatting (bold, italics, etc.)
+
+Only change:
+- Verb tenses to {target_tense} tense
+- Related time expressions as needed
+
+Original text:
+{content}
+
+Rewritten text with consistent {target_tense} tense:"""
+
+            self.log_message("Sending tense correction request to AI...")
+            corrected_content = self.query_openwebui(prompt)
+
+            if corrected_content and not corrected_content.startswith("Error:"):
+                self.generated_content = corrected_content
+                self.show_generated_content()
+                self.notebook.select(0)
+                self.log_message("✓ Tense correction completed - review in preview")
+                messagebox.showinfo("Success",
+                    f"Content corrected to {target_tense} tense.\n\n"
+                    "Review the changes in the preview and commit if acceptable.")
+            else:
+                self.log_message(f"Tense correction failed: {corrected_content}")
+                messagebox.showerror("Error", f"Failed to correct tenses: {corrected_content}")
+
+        except Exception as e:
+            self.log_message(f"Error correcting tenses: {e}")
+            messagebox.showerror("Error", f"Failed to correct tenses: {str(e)}")
+
     def show_processing_strategy_dialog(self):
         """NEW FEATURE: Display content processing strategy analysis"""
         if not self.content_processor:
@@ -7288,6 +7374,49 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
             
         except Exception as e:
             messagebox.showerror("Analysis Error", f"Failed to analyze tenses: {str(e)}")
+
+    def _correct_section_tenses(self, target_tense):
+        """Correct section tenses using AI"""
+        try:
+            self.log_message(f"Correcting tenses to {target_tense}...")
+
+            content = self.selected_section.get_existing_content()
+
+            prompt = f"""Rewrite the following text to use consistent {target_tense} tense throughout.
+
+Maintain:
+- All factual information and technical details
+- Document structure and formatting
+- Overall meaning and intent
+- Markdown formatting (bold, italics, etc.)
+
+Only change:
+- Verb tenses to {target_tense} tense
+- Related time expressions as needed
+
+Original text:
+{content}
+
+Rewritten text with consistent {target_tense} tense:"""
+
+            self.log_message("Sending tense correction request to AI...")
+            corrected_content = self.query_openwebui(prompt)
+
+            if corrected_content and not corrected_content.startswith("Error:"):
+                self.generated_content = corrected_content
+                self.show_generated_content()
+                self.notebook.select(0)
+                self.log_message("✓ Tense correction completed - review in preview")
+                messagebox.showinfo("Success",
+                    f"Content corrected to {target_tense} tense.\n\n"
+                    "Review the changes in the preview and commit if acceptable.")
+            else:
+                self.log_message(f"Tense correction failed: {corrected_content}")
+                messagebox.showerror("Error", f"Failed to correct tenses: {corrected_content}")
+
+        except Exception as e:
+            self.log_message(f"Error correcting tenses: {e}")
+            messagebox.showerror("Error", f"Failed to correct tenses: {str(e)}")
 
     def show_processing_strategy_dialog(self):
         """NEW FEATURE: Display content processing strategy analysis"""
