@@ -82,6 +82,7 @@ class DocumentSection:
         self.children = []
         self.parent = None
         self.content_paragraphs = []
+        self.comments = []  # Store comments associated with this section
         
     def add_child(self, child):
         child.parent = self
@@ -1389,16 +1390,44 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
                 messagebox.showerror("Error", f"Failed to load configuration: {str(e)}")
 
     def save_config_as(self):
-        """Save configuration to a new file"""
+        """Save configuration to a new file with encryption support"""
+        # Check if API key is present
+        has_api_key = self.openwebui_api_key and len(self.openwebui_api_key.strip()) > 0
+
+        # Show warning if API key is present
+        if has_api_key:
+            response = messagebox.askyesno(
+                "API Key Detected",
+                "Your configuration contains an API key.\n\n"
+                "IMPORTANT: It is strongly recommended to save with encryption (.enc).\n\n"
+                "Would you like to save as encrypted (.enc)?\n\n"
+                "Select 'Yes' for encrypted (.enc) - RECOMMENDED\n"
+                "Select 'No' for unencrypted (.json) - NOT RECOMMENDED",
+                icon='warning'
+            )
+            if response:
+                # User chose encrypted
+                default_ext = ".enc"
+                filetypes = [("Encrypted files", "*.enc"), ("JSON files", "*.json"), ("All files", "*.*")]
+            else:
+                # User chose unencrypted despite warning
+                default_ext = ".json"
+                filetypes = [("JSON files", "*.json"), ("Encrypted files", "*.enc"), ("All files", "*.*")]
+        else:
+            # No API key, default to .enc but allow both
+            default_ext = ".enc"
+            filetypes = [("Encrypted files", "*.enc"), ("JSON files", "*.json"), ("All files", "*.*")]
+
         filename = filedialog.asksaveasfilename(
             title="Save Configuration As",
-            defaultextension=".json",
-            filetypes=[("JSON files", "*.json"), ("All files", "*.*")]
+            defaultextension=default_ext,
+            filetypes=filetypes
         )
+
         if filename:
             try:
                 script_dir = os.path.dirname(os.path.abspath(__file__))
-                
+
                 # Create knowledge collections list with minimal info
                 saved_collections = []
                 if self.selected_knowledge_collections and isinstance(self.selected_knowledge_collections, list):
@@ -1434,12 +1463,61 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
                         'ask_backup': self.auto_config['ask_backup'].get()
                     }
                 }
-                
-                with open(filename, 'w') as f:
-                    json.dump(config, f, indent=2)
-                
-                self.log_message(f"Configuration saved to: {filename}")
-                messagebox.showinfo("Success", "Configuration saved successfully")
+
+                # Check if file should be encrypted based on extension
+                if filename.endswith('.enc'):
+                    # Use credential manager to save encrypted
+                    if self.credential_manager:
+                        # Create credentials structure
+                        credentials = {
+                            'openwebui': {
+                                'base_url': config['base_url'],
+                                'api_key': config['api_key'],
+                                'default_model': config['model'],
+                                'temperature': config['temperature'],
+                                'max_tokens': config['max_tokens'],
+                                'knowledge_collections': config['knowledge_collections'],
+                                'master_prompt': config['master_prompt']
+                            },
+                            'format_config': config['format_config'],
+                            'auto_config': config['auto_config']
+                        }
+
+                        # Set credentials in manager
+                        for key, value in credentials.items():
+                            if isinstance(value, dict):
+                                self.credential_manager.set_credential(key, value)
+
+                        # Prompt for password
+                        password = tk.simpledialog.askstring(
+                            "Encryption Password",
+                            "Enter password to encrypt the configuration file:",
+                            show='*',
+                            parent=self.root
+                        )
+
+                        if password:
+                            # Save encrypted
+                            self.credential_manager.credentials_file = filename
+                            if self.credential_manager.save_credentials(password):
+                                self.log_message(f"Configuration saved (encrypted) to: {filename}")
+                                messagebox.showinfo("Success", "Configuration saved successfully (encrypted)")
+                            else:
+                                raise Exception("Failed to save encrypted credentials")
+                        else:
+                            self.log_message("Save cancelled - no password provided")
+                            return
+                    else:
+                        messagebox.showerror("Error", "Credential manager not available. Cannot save encrypted file.")
+                        return
+                else:
+                    # Save as unencrypted JSON
+                    with open(filename, 'w') as f:
+                        json.dump(config, f, indent=2)
+
+                    self.log_message(f"Configuration saved to: {filename}")
+                    messagebox.showinfo("Success", "Configuration saved successfully")
+
             except Exception as e:
                 self.log_message(f"Error saving configuration: {str(e)}")
                 messagebox.showerror("Error", f"Failed to save configuration: {str(e)}")
@@ -2522,37 +2600,101 @@ Rewritten text with consistent {target_tense} tense:"""
             self.reload_btn.config(state=tk.NORMAL)
             self.log_message(f"Error during reload: {str(e)}")
             messagebox.showerror("Reload Failed", f"Failed to reload document: {str(e)}")
-    
+
+    def extract_comments_from_document(self):
+        """Extract comments from Word document"""
+        comments_dict = {}
+        try:
+            # Access the comments part from the document XML
+            document_part = self.document.part
+
+            # Check if comments part exists
+            if document_part.package.part_exists('/word/comments.xml'):
+                comments_part = document_part.package.part_related_by('/word/comments.xml')
+                comments_element = comments_part.element
+
+                # Parse comments
+                for comment in comments_element.findall('.//{http://schemas.openxmlformats.org/wordprocessingml/2006/main}comment'):
+                    comment_id = comment.get('{http://schemas.openxmlformats.org/wordprocessingml/2006/main}id')
+                    comment_author = comment.get('{http://schemas.openxmlformats.org/wordprocessingml/2006/main}author', 'Unknown')
+                    comment_date = comment.get('{http://schemas.openxmlformats.org/wordprocessingml/2006/main}date', '')
+
+                    # Extract comment text
+                    comment_text_parts = []
+                    for text_elem in comment.findall('.//{http://schemas.openxmlformats.org/wordprocessingml/2006/main}t'):
+                        if text_elem.text:
+                            comment_text_parts.append(text_elem.text)
+
+                    comment_text = ''.join(comment_text_parts)
+
+                    if comment_id and comment_text.strip():
+                        comments_dict[comment_id] = {
+                            'text': comment_text.strip(),
+                            'author': comment_author,
+                            'date': comment_date
+                        }
+
+            # Map comments to paragraphs
+            para_comments = {}
+            for para_idx, para in enumerate(self.document.paragraphs):
+                para_comment_refs = []
+
+                # Find comment references in paragraph XML
+                for comment_ref in para._element.findall('.//{http://schemas.openxmlformats.org/wordprocessingml/2006/main}commentRangeStart'):
+                    comment_id = comment_ref.get('{http://schemas.openxmlformats.org/wordprocessingml/2006/main}id')
+                    if comment_id in comments_dict:
+                        para_comment_refs.append(comments_dict[comment_id])
+
+                if para_comment_refs:
+                    para_comments[para_idx] = para_comment_refs
+
+            return para_comments
+
+        except Exception as e:
+            self.log_message(f"Note: Could not extract comments: {str(e)}")
+            return {}
+
     def parse_document_structure(self):
-        """Parse document into hierarchical structure"""
+        """Parse document into hierarchical structure with comment extraction"""
         self.sections = []
         section_stack = []
         current_section = None
-        
-        for para in self.document.paragraphs:
+
+        # Extract comments from document
+        para_comments = self.extract_comments_from_document()
+
+        for para_idx, para in enumerate(self.document.paragraphs):
             if para.style.name.startswith('Heading'):
                 try:
                     level = int(para.style.name.replace('Heading ', ''))
                     if level <= 4:
                         section = DocumentSection(level, para.text.strip(), para)
-                        
+
+                        # Associate comments with this heading if present
+                        if para_idx in para_comments:
+                            section.comments.extend(para_comments[para_idx])
+
                         while section_stack and section_stack[-1].level >= level:
                             section_stack.pop()
-                        
+
                         if section_stack:
                             section_stack[-1].add_child(section)
                         else:
                             self.sections.append(section)
-                        
+
                         section_stack.append(section)
                         current_section = section
-                        
+
                 except ValueError:
                     pass
             else:
                 if current_section and para.text.strip():
                     if not para.text.strip().startswith('-'):
                         current_section.content_paragraphs.append(para)
+
+                        # Associate comments from content paragraphs with the section
+                        if para_idx in para_comments:
+                            current_section.comments.extend(para_comments[para_idx])
                         
     def populate_tree(self):
         """Populate treeview with document sections"""
@@ -2801,18 +2943,6 @@ Rewritten text with consistent {target_tense} tense:"""
         main_frame = ttk.Frame(config_window, padding="15")
         main_frame.pack(fill=tk.BOTH, expand=True)
 
-        # Configuration Files section
-        config_file_frame = ttk.LabelFrame(main_frame, text="Configuration Files", padding="8")
-        config_file_frame.pack(fill=tk.X, pady=(0, 8))
-
-        config_btn_frame = ttk.Frame(config_file_frame)
-        config_btn_frame.pack(fill=tk.X)
-
-        ttk.Button(config_btn_frame, text="Load Config",
-                command=self.browse_config_file).pack(side=tk.LEFT, padx=(0, 10))
-        ttk.Button(config_btn_frame, text="Save Config As",
-                command=self.save_config_as).pack(side=tk.LEFT)
-
         # Connection settings - SIDE BY SIDE
         conn_frame = ttk.LabelFrame(main_frame, text="Connection", padding="8")
         conn_frame.pack(fill=tk.X, pady=(0, 8))
@@ -2900,7 +3030,7 @@ Rewritten text with consistent {target_tense} tense:"""
         # Buttons
         btn_frame = ttk.Frame(main_frame)
         btn_frame.pack(fill=tk.X, pady=(10, 0))
-        
+
         def save_and_close():
             self.openwebui_base_url = url_var.get()
             self.openwebui_api_key = key_var.get()
@@ -2919,7 +3049,12 @@ Rewritten text with consistent {target_tense} tense:"""
                 self.refresh_advanced_modules()
 
             config_window.destroy()
-        
+
+        # Left side: Load and Save As buttons
+        ttk.Button(btn_frame, text="Load", command=self.browse_config_file).pack(side=tk.LEFT)
+        ttk.Button(btn_frame, text="Save As", command=self.save_config_as).pack(side=tk.LEFT, padx=(5, 0))
+
+        # Right side: Cancel and Save buttons
         ttk.Button(btn_frame, text="Save", command=save_and_close).pack(side=tk.RIGHT, padx=(5, 0))
         ttk.Button(btn_frame, text="Cancel", command=config_window.destroy).pack(side=tk.RIGHT)
         
@@ -3435,6 +3570,25 @@ Rewritten text with consistent {target_tense} tense:"""
                 prompt += f"\n\nEXISTING CONTENT:\n{existing_content}\n\n"
                 prompt += "Your task: Add additional relevant content."
                 self.log_message("➕ Mode: Append (adding to existing content)")
+
+            # Add document comments as guidance
+            if section.comments and len(section.comments) > 0:
+                prompt += "\n\n" + "="*60 + "\n"
+                prompt += "DOCUMENT COMMENTS (GUIDANCE):\n"
+                prompt += "="*60 + "\n"
+                prompt += "The following comments were found in the Word document for this section:\n\n"
+                for idx, comment in enumerate(section.comments, 1):
+                    comment_text = comment.get('text', '')
+                    comment_author = comment.get('author', 'Unknown')
+                    prompt += f"{idx}. [{comment_author}]: {comment_text}\n"
+                prompt += "\n" + "="*60 + "\n"
+                prompt += "IMPORTANT INSTRUCTIONS FOR COMMENTS:\n"
+                prompt += "- Use these comments as GUIDANCE for improving this section\n"
+                prompt += "- DO NOT include the comment text itself in the generated content\n"
+                prompt += "- Instead, address what the comments are asking for in your response\n"
+                prompt += "- Treat comments as feedback on what to improve or add\n"
+                prompt += "="*60 + "\n"
+                self.log_message(f"💬 Including {len(section.comments)} document comment(s) as guidance")
 
             # Add knowledge base instruction
             if self.selected_knowledge_collections and isinstance(self.selected_knowledge_collections, list):
