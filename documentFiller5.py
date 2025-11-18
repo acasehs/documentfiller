@@ -32,6 +32,14 @@ import uuid
 # Add after existing imports, before class definitions
 
 # ============================================================================
+# CONFIGURATION OPTIONS
+# ============================================================================
+# Set to True to auto-load default credential file without prompting
+# Set to False to prompt user to select credential file on startup (recommended)
+AUTO_LOAD_CREDENTIALS = False
+DEFAULT_CREDENTIAL_FILE = "config_credentials.enc"
+
+# ============================================================================
 # ENHANCED MODULE IMPORTS - Optional for graceful degradation
 # ============================================================================
 ENHANCED_FEATURES_AVAILABLE = {
@@ -279,8 +287,51 @@ class DocxDocumentFiller:
 
         if ENHANCED_FEATURES_AVAILABLE['encryption'] and CredentialManager:
             try:
-                self.credential_manager = CredentialManager()
-                print("✓ Credential manager initialized")
+                # Prompt for credential file selection if auto-load is disabled
+                credential_file = DEFAULT_CREDENTIAL_FILE
+
+                if not AUTO_LOAD_CREDENTIALS:
+                    # Prompt user to select credential file
+                    script_dir = os.path.dirname(os.path.abspath(__file__))
+                    default_path = os.path.join(script_dir, DEFAULT_CREDENTIAL_FILE)
+
+                    result = messagebox.askyesnocancel(
+                        "Select Credentials",
+                        f"Load credentials from default file?\n\n{DEFAULT_CREDENTIAL_FILE}\n\n" +
+                        "Yes: Load default file\n" +
+                        "No: Select different file\n" +
+                        "Cancel: Skip credential loading"
+                    )
+
+                    if result is None:  # Cancel
+                        print("⊘ User skipped credential loading")
+                        credential_file = None
+                    elif result is False:  # No - browse for file
+                        selected_file = filedialog.askopenfilename(
+                            title="Select Credentials File",
+                            initialdir=script_dir,
+                            filetypes=[
+                                ("Encrypted credentials", "*.enc"),
+                                ("JSON files", "*.json"),
+                                ("All files", "*.*")
+                            ]
+                        )
+                        if selected_file:
+                            credential_file = selected_file
+                            print(f"✓ User selected: {os.path.basename(credential_file)}")
+                        else:
+                            print("⊘ No file selected - skipping credential loading")
+                            credential_file = None
+                    else:  # Yes - use default
+                        print(f"✓ Using default credential file: {DEFAULT_CREDENTIAL_FILE}")
+
+                # Initialize credential manager with selected file
+                if credential_file:
+                    self.credential_manager = CredentialManager(credential_file)
+                    print("✓ Credential manager initialized")
+                else:
+                    print("⊘ Credential manager not initialized - no file selected")
+
             except Exception as e:
                 print(f"⚠ Credential manager init failed: {e}")
 
