@@ -1108,7 +1108,7 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
             self.update_status("Using default settings")
 
     def save_settings(self):
-        """Save current settings - to encrypted credentials if available, otherwise JSON"""
+        """Save current settings to JSON and last_document.txt (no password prompts)"""
         try:
             script_dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -1122,42 +1122,7 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
                             'name': col['name']
                         })
 
-            # Try to save to encrypted credentials if available
-            if self.credential_manager and self.credential_manager.is_encrypted:
-                try:
-                    self.update_status("Saving to encrypted credentials...")
-
-                    # Update credentials with current settings
-                    self.credential_manager.set_credential('openwebui', 'base_url', self.openwebui_base_url)
-                    self.credential_manager.set_credential('openwebui', 'api_key', self.openwebui_api_key)
-                    self.credential_manager.set_credential('openwebui', 'default_model', self.selected_model.get())
-                    self.credential_manager.set_credential('openwebui', 'temperature', self.temperature.get())
-                    self.credential_manager.set_credential('openwebui', 'max_tokens', self.max_tokens.get())
-                    self.credential_manager.set_credential('openwebui', 'knowledge_collections', saved_collections)
-                    self.credential_manager.set_credential('openwebui', 'last_used', datetime.now().isoformat())
-
-                    # Prompt for password to save
-                    from tkinter import simpledialog
-                    password = simpledialog.askstring(
-                        "Save Credentials",
-                        "Enter password to save encrypted credentials:",
-                        show='*',
-                        parent=self.root
-                    )
-
-                    if password:
-                        if self.credential_manager.save_credentials(password):
-                            self.update_status("Settings saved to encrypted credentials")
-                            print("✓ Settings saved to encrypted credentials")
-                            return
-                    else:
-                        self.update_status("Save cancelled")
-                        return
-                except Exception as e:
-                    print(f"Note: Could not save to encrypted credentials: {e}")
-                    self.update_status("Saving to JSON config instead...")
-
-            # Fall back to JSON config
+            # Save to JSON config (no password prompts for automatic saves)
             config_file = os.path.join(script_dir, "openwebui_config.json")
 
             config = {
@@ -1189,22 +1154,14 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
             with open(config_file, 'w') as f:
                 json.dump(config, f, indent=2)
 
+            # Save last document path for auto-load on next startup
             if self.document_path:
                 last_doc_file = os.path.join(script_dir, "last_document.txt")
                 with open(last_doc_file, 'w') as f:
                     f.write(self.document_path)
 
             self.update_status("Settings saved")
-                    
             self.log_message("Settings saved")
-            
-            if self.credential_manager and self.credential_manager.is_encrypted:
-                try:
-                    self.save_to_encrypted_credentials()
-                    self.log_message("✓ Also backed up to encrypted credentials")
-                except Exception as e:
-                    self.log_message(f"Note: Encrypted backup not saved: {e}")
-        
 
         except Exception as e:
             self.log_message(f"Error saving settings: {str(e)}")
