@@ -1719,11 +1719,15 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
         # Reduced padding for all buttons
         btn_pady = (0, 5)
 
+        # ===== SECTION-LEVEL OPERATIONS =====
+        section_label = tk.Label(button_frame, text="SECTION OPERATIONS",
+                                bg="#1e1e1e", fg="#888888", font=("Arial", 8, "bold"))
+        section_label.pack(fill=tk.X, pady=(0, 5))
+
         self.generate_btn = ttk.Button(button_frame, text="Generate Content",
                                     command=self.generate_content, state='disabled')
         self.generate_btn.pack(fill=tk.X, pady=btn_pady)
 
-        # Review button
         self.review_btn = ttk.Button(button_frame, text="📝 Review Section",
                                     command=self.conduct_section_review, state='disabled')
         self.review_btn.pack(fill=tk.X, pady=btn_pady)
@@ -1732,33 +1736,47 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
                                     command=self.analyze_document_tenses, state='disabled')
         self.tense_btn.pack(fill=tk.X, pady=btn_pady)
 
-        # Check & Fix Tenses button
-        self.check_fix_tenses_btn = ttk.Button(button_frame, text="✏️ Check & Fix Tenses",
-                                               command=self.check_and_fix_tenses, state='disabled')
-        self.check_fix_tenses_btn.pack(fill=tk.X, pady=btn_pady)
+        self.check_fix_section_tenses_btn = ttk.Button(button_frame, text="✏️ Check & Fix Tenses",
+                                               command=self.check_and_fix_section_tenses, state='disabled')
+        self.check_fix_section_tenses_btn.pack(fill=tk.X, pady=btn_pady)
 
-        # Processing Strategy button
-        ttk.Button(button_frame, text="🧠 Processing Strategy",
-                command=self.show_processing_strategy_dialog).pack(fill=tk.X, pady=btn_pady)
-
-        # Apply review suggestions button
         self.apply_suggestions_btn = ttk.Button(button_frame, text="✅ Apply Suggestions",
                                             command=self.apply_review_suggestions,
                                             state='disabled')
         self.apply_suggestions_btn.pack(fill=tk.X, pady=btn_pady)
 
-        # Regenerate from review button
         self.regenerate_from_review_btn = ttk.Button(button_frame, text="🔄 Regenerate Review",
                                                     command=self.regenerate_from_review,
                                                     state='disabled')
         self.regenerate_from_review_btn.pack(fill=tk.X, pady=btn_pady)
 
-        # Whole Document Review
+        # Separator
+        ttk.Separator(button_frame, orient='horizontal').pack(fill=tk.X, pady=10)
+
+        # ===== DOCUMENT-LEVEL OPERATIONS =====
+        document_label = tk.Label(button_frame, text="DOCUMENT OPERATIONS",
+                                 bg="#1e1e1e", fg="#888888", font=("Arial", 8, "bold"))
+        document_label.pack(fill=tk.X, pady=(0, 5))
+
         ttk.Button(button_frame, text="📋 Review Document",
                 command=self.review_whole_document).pack(fill=tk.X, pady=btn_pady)
 
+        ttk.Button(button_frame, text="✏️ Check & Fix Document Tenses",
+                command=self.check_and_fix_document_tenses).pack(fill=tk.X, pady=btn_pady)
+
         ttk.Button(button_frame, text="🚀 Auto Complete",
                 command=self.auto_complete_document).pack(fill=tk.X, pady=btn_pady)
+
+        # Separator
+        ttk.Separator(button_frame, orient='horizontal').pack(fill=tk.X, pady=10)
+
+        # ===== UTILITIES =====
+        utilities_label = tk.Label(button_frame, text="UTILITIES",
+                                  bg="#1e1e1e", fg="#888888", font=("Arial", 8, "bold"))
+        utilities_label.pack(fill=tk.X, pady=(0, 5))
+
+        ttk.Button(button_frame, text="🧠 Processing Strategy",
+                command=self.show_processing_strategy_dialog).pack(fill=tk.X, pady=btn_pady)
         
         # Right panel
         right_panel = ttk.Frame(content_frame)
@@ -1900,8 +1918,8 @@ Rewritten text with consistent {target_tense} tense:"""
             self.log_message(f"Error correcting tenses: {e}")
             messagebox.showerror("Error", f"Failed to correct tenses: {str(e)}")
 
-    def check_and_fix_tenses(self):
-        """NEW FEATURE: Interactive tense checking and fixing for entire document"""
+    def check_and_fix_section_tenses(self):
+        """Interactive tense checking and fixing for selected section"""
         if not self.selected_section:
             messagebox.showwarning("No Selection", "Please select a section to check tenses")
             return
@@ -1927,17 +1945,142 @@ Rewritten text with consistent {target_tense} tense:"""
         content = self.selected_section.get_existing_content()
 
         try:
-            self.log_message("Analyzing document tenses...")
+            self.log_message("Analyzing section tenses...")
             tense_analysis = self.advanced_reviewer.analyze_tense_consistency(content)
 
             # Create dialog for tense analysis and fixing
-            self._show_tense_fix_dialog(tense_analysis)
+            self._show_tense_fix_dialog(tense_analysis, scope="section")
 
         except Exception as e:
             messagebox.showerror("Analysis Error", f"Failed to analyze tenses: {str(e)}")
             self.log_message(f"Tense analysis error: {e}")
 
-    def _show_tense_fix_dialog(self, tense_analysis):
+    def check_and_fix_document_tenses(self):
+        """Interactive tense checking and fixing for entire document"""
+        if not self.document_sections:
+            messagebox.showwarning("No Document", "Please load a document first")
+            return
+
+        if not self.advanced_reviewer:
+            messagebox.showinfo("Feature Unavailable",
+                            "Advanced tense analysis requires document_reviewer module.\n\n"
+                            "To enable this feature:\n"
+                            "1. Ensure document_reviewer.py is in the same directory\n"
+                            "2. Install dependencies:\n"
+                            "   pip install textstat nltk --break-system-packages\n"
+                            "3. Run NLTK setup:\n"
+                            "   python -c \"import nltk; nltk.download('punkt'); "
+                            "nltk.download('averaged_perceptron_tagger'); "
+                            "nltk.download('stopwords')\"\n"
+                            "4. Restart the application")
+            return
+
+        # Collect all content from all sections
+        all_content = []
+        for section in self.document_sections:
+            section_content = self._collect_section_content(section)
+            if section_content:
+                all_content.append(section_content)
+
+        if not all_content:
+            messagebox.showinfo("No Content", "Document has no content to analyze")
+            return
+
+        full_content = "\n\n".join(all_content)
+
+        try:
+            self.log_message("Analyzing entire document tenses...")
+            tense_analysis = self.advanced_reviewer.analyze_tense_consistency(full_content)
+
+            # Create dialog for tense analysis and fixing
+            self._show_tense_fix_dialog(tense_analysis, scope="document")
+
+        except Exception as e:
+            messagebox.showerror("Analysis Error", f"Failed to analyze tenses: {str(e)}")
+            self.log_message(f"Tense analysis error: {e}")
+
+    def _collect_section_content(self, section):
+        """Recursively collect content from a section and its children"""
+        content_parts = []
+
+        if section.has_content():
+            content_parts.append(section.get_existing_content())
+
+        for child in section.children:
+            child_content = self._collect_section_content(child)
+            if child_content:
+                content_parts.append(child_content)
+
+        return "\n\n".join(content_parts) if content_parts else ""
+
+    def _correct_document_tenses(self, target_tense):
+        """Correct tenses across entire document using AI"""
+        try:
+            self.log_message(f"Correcting entire document to {target_tense} tense...")
+
+            # Collect all sections with content
+            sections_to_fix = []
+            for section in self.document_sections:
+                self._collect_sections_with_content(section, sections_to_fix)
+
+            if not sections_to_fix:
+                messagebox.showinfo("No Content", "No sections with content to fix")
+                return
+
+            total_sections = len(sections_to_fix)
+            self.log_message(f"Found {total_sections} sections with content to fix")
+
+            # Process each section
+            fixed_count = 0
+            for i, section in enumerate(sections_to_fix, 1):
+                self.log_message(f"Processing section {i}/{total_sections}: {section.get_full_path()}")
+
+                content = section.get_existing_content()
+
+                prompt = f"""Rewrite the following text to use consistent {target_tense} tense throughout.
+
+Maintain:
+- All factual information and technical details
+- Document structure and formatting
+- Overall meaning and intent
+- Markdown formatting (bold, italics, etc.)
+
+Only change:
+- Verb tenses to {target_tense} tense
+- Related time expressions as needed
+
+Original text:
+{content}
+
+Rewritten text with consistent {target_tense} tense:"""
+
+                corrected_content = self.query_openwebui(prompt)
+
+                if corrected_content and not corrected_content.startswith("Error:"):
+                    section.generated_content = corrected_content
+                    fixed_count += 1
+                    self.log_message(f"✓ Fixed section {i}/{total_sections}")
+                else:
+                    self.log_message(f"✗ Failed to fix section {i}/{total_sections}")
+
+            messagebox.showinfo("Document Tense Correction Complete",
+                f"Successfully corrected {fixed_count} out of {total_sections} sections.\n\n"
+                "Review each section and commit the changes you want to keep.")
+            self.log_message(f"Document tense correction completed: {fixed_count}/{total_sections} sections")
+
+        except Exception as e:
+            self.log_message(f"Error correcting document tenses: {e}")
+            messagebox.showerror("Error", f"Failed to correct document tenses: {str(e)}")
+
+    def _collect_sections_with_content(self, section, sections_list):
+        """Recursively collect sections that have content"""
+        if section.has_content():
+            sections_list.append(section)
+
+        for child in section.children:
+            self._collect_sections_with_content(child, sections_list)
+
+    def _show_tense_fix_dialog(self, tense_analysis, scope="section"):
         """Display tense analysis results with options to fix"""
         dialog = tk.Toplevel(self.root)
         dialog.title("Check & Fix Tenses")
@@ -1949,27 +2092,31 @@ Rewritten text with consistent {target_tense} tense:"""
         dialog.grab_set()
 
         # Main container with padding
-        main_frame = tk.Frame(dialog, bg="#2b2b2b", padx=20, pady=20)
-        main_frame.pack(fill=tk.BOTH, expand=True)
+        main_frame = tk.Frame(dialog, bg="#2b2b2b")
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
 
         # Title
         title_label = tk.Label(main_frame, text="Tense Consistency Analysis",
                               font=("Arial", 14, "bold"), bg="#2b2b2b", fg="#ffffff")
-        title_label.pack(pady=(0, 10))
+        title_label.pack(pady=10)
 
-        # Section path
-        path_label = tk.Label(main_frame,
-                             text=f"Section: {self.selected_section.get_full_path()}",
+        # Scope label
+        if scope == "section" and self.selected_section:
+            scope_text = f"Section: {self.selected_section.get_full_path()}"
+        else:
+            scope_text = "Scope: Entire Document"
+
+        path_label = tk.Label(main_frame, text=scope_text,
                              bg="#2b2b2b", fg="#a0a0a0", font=("Arial", 9))
-        path_label.pack(pady=(0, 15))
+        path_label.pack(pady=5)
 
         # Analysis results frame
         results_frame = tk.Frame(main_frame, bg="#3a3a3a", relief=tk.SOLID, borderwidth=1)
-        results_frame.pack(fill=tk.X, pady=(0, 15))
+        results_frame.pack(fill=tk.BOTH, expand=True, pady=15)
 
         # Results content
-        results_content = tk.Frame(results_frame, bg="#3a3a3a", padx=15, pady=15)
-        results_content.pack(fill=tk.X)
+        results_content = tk.Frame(results_frame, bg="#3a3a3a")
+        results_content.pack(fill=tk.BOTH, expand=True, padx=15, pady=15)
 
         # Dominant tense
         dominant_label = tk.Label(results_content,
@@ -1982,11 +2129,11 @@ Rewritten text with consistent {target_tense} tense:"""
         score_label = tk.Label(results_content,
                               text=f"Consistency Score: {tense_analysis.consistency_score:.1f}/10",
                               bg="#3a3a3a", fg=score_color, font=("Arial", 11))
-        score_label.pack(anchor=tk.W, pady=(5, 10))
+        score_label.pack(anchor=tk.W, pady=5)
 
         # Distribution frame
         dist_frame = tk.Frame(results_content, bg="#3a3a3a")
-        dist_frame.pack(fill=tk.X, pady=(5, 0))
+        dist_frame.pack(fill=tk.X, pady=10)
 
         tk.Label(dist_frame, text="Tense Distribution:",
                 bg="#3a3a3a", fg="#ffffff", font=("Arial", 10, "bold")).pack(anchor=tk.W)
@@ -2001,18 +2148,15 @@ Rewritten text with consistent {target_tense} tense:"""
         # Inconsistent sentences section
         if tense_analysis.inconsistent_sentences:
             incon_label = tk.Label(results_content,
-                                  text=f"\nInconsistent Sentences: {len(tense_analysis.inconsistent_sentences)}",
+                                  text=f"Inconsistent Sentences: {len(tense_analysis.inconsistent_sentences)}",
                                   bg="#3a3a3a", fg="#FFA500", font=("Arial", 10, "bold"))
-            incon_label.pack(anchor=tk.W, pady=(10, 5))
+            incon_label.pack(anchor=tk.W, pady=10)
 
             # Scrollable text widget for inconsistent sentences
-            text_frame = tk.Frame(results_frame, bg="#3a3a3a", padx=15, pady=(0, 15))
-            text_frame.pack(fill=tk.BOTH, expand=True)
-
-            text_widget = scrolledtext.ScrolledText(text_frame, height=8, wrap=tk.WORD,
+            text_widget = scrolledtext.ScrolledText(results_content, height=8, wrap=tk.WORD,
                                                    bg="#2b2b2b", fg="#ffffff",
                                                    font=("Arial", 9))
-            text_widget.pack(fill=tk.BOTH, expand=True)
+            text_widget.pack(fill=tk.BOTH, expand=True, pady=5)
 
             for i, sentence in enumerate(tense_analysis.inconsistent_sentences[:20], 1):
                 text_widget.insert(tk.END, f"{i}. {sentence}\n\n")
@@ -2022,41 +2166,46 @@ Rewritten text with consistent {target_tense} tense:"""
 
             text_widget.config(state=tk.DISABLED)
         else:
-            check_label = tk.Label(results_content, text="\n✓ No tense inconsistencies detected!",
+            check_label = tk.Label(results_content, text="✓ No tense inconsistencies detected!",
                                   bg="#3a3a3a", fg="#4CAF50", font=("Arial", 10))
-            check_label.pack(anchor=tk.W, pady=(10, 0))
+            check_label.pack(anchor=tk.W, pady=10)
 
         # Fix options section
         fix_frame = tk.Frame(main_frame, bg="#2b2b2b")
-        fix_frame.pack(fill=tk.X, pady=(10, 0))
+        fix_frame.pack(fill=tk.X, pady=10)
 
         tk.Label(fix_frame, text="Fix Tenses To:", bg="#2b2b2b", fg="#ffffff",
-                font=("Arial", 11, "bold")).pack(anchor=tk.W, pady=(0, 10))
+                font=("Arial", 11, "bold")).pack(anchor=tk.W, pady=5)
 
         # Tense selection buttons
         button_frame = tk.Frame(fix_frame, bg="#2b2b2b")
-        button_frame.pack(fill=tk.X, pady=(0, 15))
+        button_frame.pack(fill=tk.X, pady=10)
 
         def fix_to_tense(target_tense):
             dialog.destroy()
-            self._correct_section_tenses(target_tense)
+            if scope == "document":
+                self._correct_document_tenses(target_tense)
+            else:
+                self._correct_section_tenses(target_tense)
 
         # Past tense button
         past_btn = ttk.Button(button_frame, text="📖 Fix to Past Tense",
                              command=lambda: fix_to_tense("past"))
-        past_btn.pack(side=tk.LEFT, padx=(0, 10), fill=tk.X, expand=True)
+        past_btn.pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
 
         # Present tense button
         present_btn = ttk.Button(button_frame, text="📝 Fix to Present Tense",
                                 command=lambda: fix_to_tense("present"))
-        present_btn.pack(side=tk.LEFT, padx=(0, 10), fill=tk.X, expand=True)
+        present_btn.pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
 
         # Future tense button
         future_btn = ttk.Button(button_frame, text="🔮 Fix to Future Tense",
                                command=lambda: fix_to_tense("future"))
-        future_btn.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        future_btn.pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
 
         # Close button
+        close_btn = ttk.Button(fix_frame, text="Close", command=dialog.destroy)
+        close_btn.pack(pady=10)
         close_btn = ttk.Button(fix_frame, text="Close", command=dialog.destroy)
         close_btn.pack(pady=(10, 0))
 
@@ -2878,14 +3027,14 @@ Rewritten text with consistent {target_tense} tense:"""
                     self.review_btn.config(state='normal')
                     if hasattr(self, 'tense_btn'):
                         self.tense_btn.config(state='normal')
-                    if hasattr(self, 'check_fix_tenses_btn'):
-                        self.check_fix_tenses_btn.config(state='normal')
+                    if hasattr(self, 'check_fix_section_tenses_btn'):
+                        self.check_fix_section_tenses_btn.config(state='normal')
                 else:
                     self.review_btn.config(state='disabled')
                     if hasattr(self, 'tense_btn'):
                         self.tense_btn.config(state='disabled')
-                    if hasattr(self, 'check_fix_tenses_btn'):
-                        self.check_fix_tenses_btn.config(state='disabled')
+                    if hasattr(self, 'check_fix_section_tenses_btn'):
+                        self.check_fix_section_tenses_btn.config(state='disabled')
 
                 self.show_existing_content()
                 self.log_message(f"Selected: {self.selected_section.get_full_path()}")
@@ -7028,8 +7177,8 @@ Rewritten text with consistent {target_tense} tense:"""
             self.log_message(f"Error correcting tenses: {e}")
             messagebox.showerror("Error", f"Failed to correct tenses: {str(e)}")
 
-    def check_and_fix_tenses(self):
-        """NEW FEATURE: Interactive tense checking and fixing for entire document"""
+    def check_and_fix_section_tenses(self):
+        """Interactive tense checking and fixing for selected section"""
         if not self.selected_section:
             messagebox.showwarning("No Selection", "Please select a section to check tenses")
             return
@@ -7055,17 +7204,142 @@ Rewritten text with consistent {target_tense} tense:"""
         content = self.selected_section.get_existing_content()
 
         try:
-            self.log_message("Analyzing document tenses...")
+            self.log_message("Analyzing section tenses...")
             tense_analysis = self.advanced_reviewer.analyze_tense_consistency(content)
 
             # Create dialog for tense analysis and fixing
-            self._show_tense_fix_dialog(tense_analysis)
+            self._show_tense_fix_dialog(tense_analysis, scope="section")
 
         except Exception as e:
             messagebox.showerror("Analysis Error", f"Failed to analyze tenses: {str(e)}")
             self.log_message(f"Tense analysis error: {e}")
 
-    def _show_tense_fix_dialog(self, tense_analysis):
+    def check_and_fix_document_tenses(self):
+        """Interactive tense checking and fixing for entire document"""
+        if not self.document_sections:
+            messagebox.showwarning("No Document", "Please load a document first")
+            return
+
+        if not self.advanced_reviewer:
+            messagebox.showinfo("Feature Unavailable",
+                            "Advanced tense analysis requires document_reviewer module.\n\n"
+                            "To enable this feature:\n"
+                            "1. Ensure document_reviewer.py is in the same directory\n"
+                            "2. Install dependencies:\n"
+                            "   pip install textstat nltk --break-system-packages\n"
+                            "3. Run NLTK setup:\n"
+                            "   python -c \"import nltk; nltk.download('punkt'); "
+                            "nltk.download('averaged_perceptron_tagger'); "
+                            "nltk.download('stopwords')\"\n"
+                            "4. Restart the application")
+            return
+
+        # Collect all content from all sections
+        all_content = []
+        for section in self.document_sections:
+            section_content = self._collect_section_content(section)
+            if section_content:
+                all_content.append(section_content)
+
+        if not all_content:
+            messagebox.showinfo("No Content", "Document has no content to analyze")
+            return
+
+        full_content = "\n\n".join(all_content)
+
+        try:
+            self.log_message("Analyzing entire document tenses...")
+            tense_analysis = self.advanced_reviewer.analyze_tense_consistency(full_content)
+
+            # Create dialog for tense analysis and fixing
+            self._show_tense_fix_dialog(tense_analysis, scope="document")
+
+        except Exception as e:
+            messagebox.showerror("Analysis Error", f"Failed to analyze tenses: {str(e)}")
+            self.log_message(f"Tense analysis error: {e}")
+
+    def _collect_section_content(self, section):
+        """Recursively collect content from a section and its children"""
+        content_parts = []
+
+        if section.has_content():
+            content_parts.append(section.get_existing_content())
+
+        for child in section.children:
+            child_content = self._collect_section_content(child)
+            if child_content:
+                content_parts.append(child_content)
+
+        return "\n\n".join(content_parts) if content_parts else ""
+
+    def _correct_document_tenses(self, target_tense):
+        """Correct tenses across entire document using AI"""
+        try:
+            self.log_message(f"Correcting entire document to {target_tense} tense...")
+
+            # Collect all sections with content
+            sections_to_fix = []
+            for section in self.document_sections:
+                self._collect_sections_with_content(section, sections_to_fix)
+
+            if not sections_to_fix:
+                messagebox.showinfo("No Content", "No sections with content to fix")
+                return
+
+            total_sections = len(sections_to_fix)
+            self.log_message(f"Found {total_sections} sections with content to fix")
+
+            # Process each section
+            fixed_count = 0
+            for i, section in enumerate(sections_to_fix, 1):
+                self.log_message(f"Processing section {i}/{total_sections}: {section.get_full_path()}")
+
+                content = section.get_existing_content()
+
+                prompt = f"""Rewrite the following text to use consistent {target_tense} tense throughout.
+
+Maintain:
+- All factual information and technical details
+- Document structure and formatting
+- Overall meaning and intent
+- Markdown formatting (bold, italics, etc.)
+
+Only change:
+- Verb tenses to {target_tense} tense
+- Related time expressions as needed
+
+Original text:
+{content}
+
+Rewritten text with consistent {target_tense} tense:"""
+
+                corrected_content = self.query_openwebui(prompt)
+
+                if corrected_content and not corrected_content.startswith("Error:"):
+                    section.generated_content = corrected_content
+                    fixed_count += 1
+                    self.log_message(f"✓ Fixed section {i}/{total_sections}")
+                else:
+                    self.log_message(f"✗ Failed to fix section {i}/{total_sections}")
+
+            messagebox.showinfo("Document Tense Correction Complete",
+                f"Successfully corrected {fixed_count} out of {total_sections} sections.\n\n"
+                "Review each section and commit the changes you want to keep.")
+            self.log_message(f"Document tense correction completed: {fixed_count}/{total_sections} sections")
+
+        except Exception as e:
+            self.log_message(f"Error correcting document tenses: {e}")
+            messagebox.showerror("Error", f"Failed to correct document tenses: {str(e)}")
+
+    def _collect_sections_with_content(self, section, sections_list):
+        """Recursively collect sections that have content"""
+        if section.has_content():
+            sections_list.append(section)
+
+        for child in section.children:
+            self._collect_sections_with_content(child, sections_list)
+
+    def _show_tense_fix_dialog(self, tense_analysis, scope="section"):
         """Display tense analysis results with options to fix"""
         dialog = tk.Toplevel(self.root)
         dialog.title("Check & Fix Tenses")
@@ -7077,27 +7351,31 @@ Rewritten text with consistent {target_tense} tense:"""
         dialog.grab_set()
 
         # Main container with padding
-        main_frame = tk.Frame(dialog, bg="#2b2b2b", padx=20, pady=20)
-        main_frame.pack(fill=tk.BOTH, expand=True)
+        main_frame = tk.Frame(dialog, bg="#2b2b2b")
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
 
         # Title
         title_label = tk.Label(main_frame, text="Tense Consistency Analysis",
                               font=("Arial", 14, "bold"), bg="#2b2b2b", fg="#ffffff")
-        title_label.pack(pady=(0, 10))
+        title_label.pack(pady=10)
 
-        # Section path
-        path_label = tk.Label(main_frame,
-                             text=f"Section: {self.selected_section.get_full_path()}",
+        # Scope label
+        if scope == "section" and self.selected_section:
+            scope_text = f"Section: {self.selected_section.get_full_path()}"
+        else:
+            scope_text = "Scope: Entire Document"
+
+        path_label = tk.Label(main_frame, text=scope_text,
                              bg="#2b2b2b", fg="#a0a0a0", font=("Arial", 9))
-        path_label.pack(pady=(0, 15))
+        path_label.pack(pady=5)
 
         # Analysis results frame
         results_frame = tk.Frame(main_frame, bg="#3a3a3a", relief=tk.SOLID, borderwidth=1)
-        results_frame.pack(fill=tk.X, pady=(0, 15))
+        results_frame.pack(fill=tk.BOTH, expand=True, pady=15)
 
         # Results content
-        results_content = tk.Frame(results_frame, bg="#3a3a3a", padx=15, pady=15)
-        results_content.pack(fill=tk.X)
+        results_content = tk.Frame(results_frame, bg="#3a3a3a")
+        results_content.pack(fill=tk.BOTH, expand=True, padx=15, pady=15)
 
         # Dominant tense
         dominant_label = tk.Label(results_content,
@@ -7110,11 +7388,11 @@ Rewritten text with consistent {target_tense} tense:"""
         score_label = tk.Label(results_content,
                               text=f"Consistency Score: {tense_analysis.consistency_score:.1f}/10",
                               bg="#3a3a3a", fg=score_color, font=("Arial", 11))
-        score_label.pack(anchor=tk.W, pady=(5, 10))
+        score_label.pack(anchor=tk.W, pady=5)
 
         # Distribution frame
         dist_frame = tk.Frame(results_content, bg="#3a3a3a")
-        dist_frame.pack(fill=tk.X, pady=(5, 0))
+        dist_frame.pack(fill=tk.X, pady=10)
 
         tk.Label(dist_frame, text="Tense Distribution:",
                 bg="#3a3a3a", fg="#ffffff", font=("Arial", 10, "bold")).pack(anchor=tk.W)
@@ -7129,18 +7407,15 @@ Rewritten text with consistent {target_tense} tense:"""
         # Inconsistent sentences section
         if tense_analysis.inconsistent_sentences:
             incon_label = tk.Label(results_content,
-                                  text=f"\nInconsistent Sentences: {len(tense_analysis.inconsistent_sentences)}",
+                                  text=f"Inconsistent Sentences: {len(tense_analysis.inconsistent_sentences)}",
                                   bg="#3a3a3a", fg="#FFA500", font=("Arial", 10, "bold"))
-            incon_label.pack(anchor=tk.W, pady=(10, 5))
+            incon_label.pack(anchor=tk.W, pady=10)
 
             # Scrollable text widget for inconsistent sentences
-            text_frame = tk.Frame(results_frame, bg="#3a3a3a", padx=15, pady=(0, 15))
-            text_frame.pack(fill=tk.BOTH, expand=True)
-
-            text_widget = scrolledtext.ScrolledText(text_frame, height=8, wrap=tk.WORD,
+            text_widget = scrolledtext.ScrolledText(results_content, height=8, wrap=tk.WORD,
                                                    bg="#2b2b2b", fg="#ffffff",
                                                    font=("Arial", 9))
-            text_widget.pack(fill=tk.BOTH, expand=True)
+            text_widget.pack(fill=tk.BOTH, expand=True, pady=5)
 
             for i, sentence in enumerate(tense_analysis.inconsistent_sentences[:20], 1):
                 text_widget.insert(tk.END, f"{i}. {sentence}\n\n")
@@ -7150,41 +7425,46 @@ Rewritten text with consistent {target_tense} tense:"""
 
             text_widget.config(state=tk.DISABLED)
         else:
-            check_label = tk.Label(results_content, text="\n✓ No tense inconsistencies detected!",
+            check_label = tk.Label(results_content, text="✓ No tense inconsistencies detected!",
                                   bg="#3a3a3a", fg="#4CAF50", font=("Arial", 10))
-            check_label.pack(anchor=tk.W, pady=(10, 0))
+            check_label.pack(anchor=tk.W, pady=10)
 
         # Fix options section
         fix_frame = tk.Frame(main_frame, bg="#2b2b2b")
-        fix_frame.pack(fill=tk.X, pady=(10, 0))
+        fix_frame.pack(fill=tk.X, pady=10)
 
         tk.Label(fix_frame, text="Fix Tenses To:", bg="#2b2b2b", fg="#ffffff",
-                font=("Arial", 11, "bold")).pack(anchor=tk.W, pady=(0, 10))
+                font=("Arial", 11, "bold")).pack(anchor=tk.W, pady=5)
 
         # Tense selection buttons
         button_frame = tk.Frame(fix_frame, bg="#2b2b2b")
-        button_frame.pack(fill=tk.X, pady=(0, 15))
+        button_frame.pack(fill=tk.X, pady=10)
 
         def fix_to_tense(target_tense):
             dialog.destroy()
-            self._correct_section_tenses(target_tense)
+            if scope == "document":
+                self._correct_document_tenses(target_tense)
+            else:
+                self._correct_section_tenses(target_tense)
 
         # Past tense button
         past_btn = ttk.Button(button_frame, text="📖 Fix to Past Tense",
                              command=lambda: fix_to_tense("past"))
-        past_btn.pack(side=tk.LEFT, padx=(0, 10), fill=tk.X, expand=True)
+        past_btn.pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
 
         # Present tense button
         present_btn = ttk.Button(button_frame, text="📝 Fix to Present Tense",
                                 command=lambda: fix_to_tense("present"))
-        present_btn.pack(side=tk.LEFT, padx=(0, 10), fill=tk.X, expand=True)
+        present_btn.pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
 
         # Future tense button
         future_btn = ttk.Button(button_frame, text="🔮 Fix to Future Tense",
                                command=lambda: fix_to_tense("future"))
-        future_btn.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        future_btn.pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
 
         # Close button
+        close_btn = ttk.Button(fix_frame, text="Close", command=dialog.destroy)
+        close_btn.pack(pady=10)
         close_btn = ttk.Button(fix_frame, text="Close", command=dialog.destroy)
         close_btn.pack(pady=(10, 0))
 
@@ -7958,8 +8238,8 @@ Rewritten text with consistent {target_tense} tense:"""
             self.log_message(f"Error correcting tenses: {e}")
             messagebox.showerror("Error", f"Failed to correct tenses: {str(e)}")
 
-    def check_and_fix_tenses(self):
-        """NEW FEATURE: Interactive tense checking and fixing for entire document"""
+    def check_and_fix_section_tenses(self):
+        """Interactive tense checking and fixing for selected section"""
         if not self.selected_section:
             messagebox.showwarning("No Selection", "Please select a section to check tenses")
             return
@@ -7985,17 +8265,142 @@ Rewritten text with consistent {target_tense} tense:"""
         content = self.selected_section.get_existing_content()
 
         try:
-            self.log_message("Analyzing document tenses...")
+            self.log_message("Analyzing section tenses...")
             tense_analysis = self.advanced_reviewer.analyze_tense_consistency(content)
 
             # Create dialog for tense analysis and fixing
-            self._show_tense_fix_dialog(tense_analysis)
+            self._show_tense_fix_dialog(tense_analysis, scope="section")
 
         except Exception as e:
             messagebox.showerror("Analysis Error", f"Failed to analyze tenses: {str(e)}")
             self.log_message(f"Tense analysis error: {e}")
 
-    def _show_tense_fix_dialog(self, tense_analysis):
+    def check_and_fix_document_tenses(self):
+        """Interactive tense checking and fixing for entire document"""
+        if not self.document_sections:
+            messagebox.showwarning("No Document", "Please load a document first")
+            return
+
+        if not self.advanced_reviewer:
+            messagebox.showinfo("Feature Unavailable",
+                            "Advanced tense analysis requires document_reviewer module.\n\n"
+                            "To enable this feature:\n"
+                            "1. Ensure document_reviewer.py is in the same directory\n"
+                            "2. Install dependencies:\n"
+                            "   pip install textstat nltk --break-system-packages\n"
+                            "3. Run NLTK setup:\n"
+                            "   python -c \"import nltk; nltk.download('punkt'); "
+                            "nltk.download('averaged_perceptron_tagger'); "
+                            "nltk.download('stopwords')\"\n"
+                            "4. Restart the application")
+            return
+
+        # Collect all content from all sections
+        all_content = []
+        for section in self.document_sections:
+            section_content = self._collect_section_content(section)
+            if section_content:
+                all_content.append(section_content)
+
+        if not all_content:
+            messagebox.showinfo("No Content", "Document has no content to analyze")
+            return
+
+        full_content = "\n\n".join(all_content)
+
+        try:
+            self.log_message("Analyzing entire document tenses...")
+            tense_analysis = self.advanced_reviewer.analyze_tense_consistency(full_content)
+
+            # Create dialog for tense analysis and fixing
+            self._show_tense_fix_dialog(tense_analysis, scope="document")
+
+        except Exception as e:
+            messagebox.showerror("Analysis Error", f"Failed to analyze tenses: {str(e)}")
+            self.log_message(f"Tense analysis error: {e}")
+
+    def _collect_section_content(self, section):
+        """Recursively collect content from a section and its children"""
+        content_parts = []
+
+        if section.has_content():
+            content_parts.append(section.get_existing_content())
+
+        for child in section.children:
+            child_content = self._collect_section_content(child)
+            if child_content:
+                content_parts.append(child_content)
+
+        return "\n\n".join(content_parts) if content_parts else ""
+
+    def _correct_document_tenses(self, target_tense):
+        """Correct tenses across entire document using AI"""
+        try:
+            self.log_message(f"Correcting entire document to {target_tense} tense...")
+
+            # Collect all sections with content
+            sections_to_fix = []
+            for section in self.document_sections:
+                self._collect_sections_with_content(section, sections_to_fix)
+
+            if not sections_to_fix:
+                messagebox.showinfo("No Content", "No sections with content to fix")
+                return
+
+            total_sections = len(sections_to_fix)
+            self.log_message(f"Found {total_sections} sections with content to fix")
+
+            # Process each section
+            fixed_count = 0
+            for i, section in enumerate(sections_to_fix, 1):
+                self.log_message(f"Processing section {i}/{total_sections}: {section.get_full_path()}")
+
+                content = section.get_existing_content()
+
+                prompt = f"""Rewrite the following text to use consistent {target_tense} tense throughout.
+
+Maintain:
+- All factual information and technical details
+- Document structure and formatting
+- Overall meaning and intent
+- Markdown formatting (bold, italics, etc.)
+
+Only change:
+- Verb tenses to {target_tense} tense
+- Related time expressions as needed
+
+Original text:
+{content}
+
+Rewritten text with consistent {target_tense} tense:"""
+
+                corrected_content = self.query_openwebui(prompt)
+
+                if corrected_content and not corrected_content.startswith("Error:"):
+                    section.generated_content = corrected_content
+                    fixed_count += 1
+                    self.log_message(f"✓ Fixed section {i}/{total_sections}")
+                else:
+                    self.log_message(f"✗ Failed to fix section {i}/{total_sections}")
+
+            messagebox.showinfo("Document Tense Correction Complete",
+                f"Successfully corrected {fixed_count} out of {total_sections} sections.\n\n"
+                "Review each section and commit the changes you want to keep.")
+            self.log_message(f"Document tense correction completed: {fixed_count}/{total_sections} sections")
+
+        except Exception as e:
+            self.log_message(f"Error correcting document tenses: {e}")
+            messagebox.showerror("Error", f"Failed to correct document tenses: {str(e)}")
+
+    def _collect_sections_with_content(self, section, sections_list):
+        """Recursively collect sections that have content"""
+        if section.has_content():
+            sections_list.append(section)
+
+        for child in section.children:
+            self._collect_sections_with_content(child, sections_list)
+
+    def _show_tense_fix_dialog(self, tense_analysis, scope="section"):
         """Display tense analysis results with options to fix"""
         dialog = tk.Toplevel(self.root)
         dialog.title("Check & Fix Tenses")
@@ -8007,27 +8412,31 @@ Rewritten text with consistent {target_tense} tense:"""
         dialog.grab_set()
 
         # Main container with padding
-        main_frame = tk.Frame(dialog, bg="#2b2b2b", padx=20, pady=20)
-        main_frame.pack(fill=tk.BOTH, expand=True)
+        main_frame = tk.Frame(dialog, bg="#2b2b2b")
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
 
         # Title
         title_label = tk.Label(main_frame, text="Tense Consistency Analysis",
                               font=("Arial", 14, "bold"), bg="#2b2b2b", fg="#ffffff")
-        title_label.pack(pady=(0, 10))
+        title_label.pack(pady=10)
 
-        # Section path
-        path_label = tk.Label(main_frame,
-                             text=f"Section: {self.selected_section.get_full_path()}",
+        # Scope label
+        if scope == "section" and self.selected_section:
+            scope_text = f"Section: {self.selected_section.get_full_path()}"
+        else:
+            scope_text = "Scope: Entire Document"
+
+        path_label = tk.Label(main_frame, text=scope_text,
                              bg="#2b2b2b", fg="#a0a0a0", font=("Arial", 9))
-        path_label.pack(pady=(0, 15))
+        path_label.pack(pady=5)
 
         # Analysis results frame
         results_frame = tk.Frame(main_frame, bg="#3a3a3a", relief=tk.SOLID, borderwidth=1)
-        results_frame.pack(fill=tk.X, pady=(0, 15))
+        results_frame.pack(fill=tk.BOTH, expand=True, pady=15)
 
         # Results content
-        results_content = tk.Frame(results_frame, bg="#3a3a3a", padx=15, pady=15)
-        results_content.pack(fill=tk.X)
+        results_content = tk.Frame(results_frame, bg="#3a3a3a")
+        results_content.pack(fill=tk.BOTH, expand=True, padx=15, pady=15)
 
         # Dominant tense
         dominant_label = tk.Label(results_content,
@@ -8040,11 +8449,11 @@ Rewritten text with consistent {target_tense} tense:"""
         score_label = tk.Label(results_content,
                               text=f"Consistency Score: {tense_analysis.consistency_score:.1f}/10",
                               bg="#3a3a3a", fg=score_color, font=("Arial", 11))
-        score_label.pack(anchor=tk.W, pady=(5, 10))
+        score_label.pack(anchor=tk.W, pady=5)
 
         # Distribution frame
         dist_frame = tk.Frame(results_content, bg="#3a3a3a")
-        dist_frame.pack(fill=tk.X, pady=(5, 0))
+        dist_frame.pack(fill=tk.X, pady=10)
 
         tk.Label(dist_frame, text="Tense Distribution:",
                 bg="#3a3a3a", fg="#ffffff", font=("Arial", 10, "bold")).pack(anchor=tk.W)
@@ -8059,18 +8468,15 @@ Rewritten text with consistent {target_tense} tense:"""
         # Inconsistent sentences section
         if tense_analysis.inconsistent_sentences:
             incon_label = tk.Label(results_content,
-                                  text=f"\nInconsistent Sentences: {len(tense_analysis.inconsistent_sentences)}",
+                                  text=f"Inconsistent Sentences: {len(tense_analysis.inconsistent_sentences)}",
                                   bg="#3a3a3a", fg="#FFA500", font=("Arial", 10, "bold"))
-            incon_label.pack(anchor=tk.W, pady=(10, 5))
+            incon_label.pack(anchor=tk.W, pady=10)
 
             # Scrollable text widget for inconsistent sentences
-            text_frame = tk.Frame(results_frame, bg="#3a3a3a", padx=15, pady=(0, 15))
-            text_frame.pack(fill=tk.BOTH, expand=True)
-
-            text_widget = scrolledtext.ScrolledText(text_frame, height=8, wrap=tk.WORD,
+            text_widget = scrolledtext.ScrolledText(results_content, height=8, wrap=tk.WORD,
                                                    bg="#2b2b2b", fg="#ffffff",
                                                    font=("Arial", 9))
-            text_widget.pack(fill=tk.BOTH, expand=True)
+            text_widget.pack(fill=tk.BOTH, expand=True, pady=5)
 
             for i, sentence in enumerate(tense_analysis.inconsistent_sentences[:20], 1):
                 text_widget.insert(tk.END, f"{i}. {sentence}\n\n")
@@ -8080,41 +8486,46 @@ Rewritten text with consistent {target_tense} tense:"""
 
             text_widget.config(state=tk.DISABLED)
         else:
-            check_label = tk.Label(results_content, text="\n✓ No tense inconsistencies detected!",
+            check_label = tk.Label(results_content, text="✓ No tense inconsistencies detected!",
                                   bg="#3a3a3a", fg="#4CAF50", font=("Arial", 10))
-            check_label.pack(anchor=tk.W, pady=(10, 0))
+            check_label.pack(anchor=tk.W, pady=10)
 
         # Fix options section
         fix_frame = tk.Frame(main_frame, bg="#2b2b2b")
-        fix_frame.pack(fill=tk.X, pady=(10, 0))
+        fix_frame.pack(fill=tk.X, pady=10)
 
         tk.Label(fix_frame, text="Fix Tenses To:", bg="#2b2b2b", fg="#ffffff",
-                font=("Arial", 11, "bold")).pack(anchor=tk.W, pady=(0, 10))
+                font=("Arial", 11, "bold")).pack(anchor=tk.W, pady=5)
 
         # Tense selection buttons
         button_frame = tk.Frame(fix_frame, bg="#2b2b2b")
-        button_frame.pack(fill=tk.X, pady=(0, 15))
+        button_frame.pack(fill=tk.X, pady=10)
 
         def fix_to_tense(target_tense):
             dialog.destroy()
-            self._correct_section_tenses(target_tense)
+            if scope == "document":
+                self._correct_document_tenses(target_tense)
+            else:
+                self._correct_section_tenses(target_tense)
 
         # Past tense button
         past_btn = ttk.Button(button_frame, text="📖 Fix to Past Tense",
                              command=lambda: fix_to_tense("past"))
-        past_btn.pack(side=tk.LEFT, padx=(0, 10), fill=tk.X, expand=True)
+        past_btn.pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
 
         # Present tense button
         present_btn = ttk.Button(button_frame, text="📝 Fix to Present Tense",
                                 command=lambda: fix_to_tense("present"))
-        present_btn.pack(side=tk.LEFT, padx=(0, 10), fill=tk.X, expand=True)
+        present_btn.pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
 
         # Future tense button
         future_btn = ttk.Button(button_frame, text="🔮 Fix to Future Tense",
                                command=lambda: fix_to_tense("future"))
-        future_btn.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        future_btn.pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
 
         # Close button
+        close_btn = ttk.Button(fix_frame, text="Close", command=dialog.destroy)
+        close_btn.pack(pady=10)
         close_btn = ttk.Button(fix_frame, text="Close", command=dialog.destroy)
         close_btn.pack(pady=(10, 0))
 
