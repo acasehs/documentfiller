@@ -2537,7 +2537,7 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
                     # Refresh models
                     self.root.after(0, lambda: status_label.config(text="🔄 Loading models..."))
                     headers = {'Authorization': f'Bearer {key}'}
-                    response = requests.get(f"{url}/api/models", headers=headers, timeout=10)
+                    response = requests.get(f"{url}/api/models", headers=headers, timeout=30)
                     
                     if response.status_code == 200:
                         data = response.json()
@@ -2568,7 +2568,7 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
                     
                     # Refresh collections
                     self.root.after(0, lambda: status_label.config(text="🔄 Loading collections..."))
-                    response = requests.get(f"{url}/api/v1/knowledge/", headers=headers, timeout=10)
+                    response = requests.get(f"{url}/api/v1/knowledge/", headers=headers, timeout=30)
                     
                     if response.status_code == 200:
                         data = response.json()
@@ -2766,7 +2766,7 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
         try:
             status_label.config(text="⏳ Testing connection...")
             headers = {'Authorization': f'Bearer {api_key}'}
-            response = requests.get(f"{url}/api/models", headers=headers, timeout=10)
+            response = requests.get(f"{url}/api/models", headers=headers, timeout=30)
             
             if response.status_code == 200:
                 status_label.config(text="✓ Connection successful")
@@ -2782,7 +2782,7 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
         try:
             combo.set("Loading models...")
             headers = {'Authorization': f'Bearer {api_key}'}
-            response = requests.get(f"{url}/api/models", headers=headers, timeout=10)
+            response = requests.get(f"{url}/api/models", headers=headers, timeout=30)
             
             if response.status_code == 200:
                 data = response.json()
@@ -2827,7 +2827,7 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
         """Refresh knowledge collections"""
         try:
             headers = {'Authorization': f'Bearer {api_key}'}
-            response = requests.get(f"{url}/api/v1/knowledge/", headers=headers, timeout=10)
+            response = requests.get(f"{url}/api/v1/knowledge/", headers=headers, timeout=30)
             
             if response.status_code == 200:
                 data = response.json()
@@ -4023,7 +4023,7 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
                 self.log_message("Auto-refreshing models...")
                 headers = {'Authorization': f'Bearer {self.openwebui_api_key}'}
                 response = requests.get(f"{self.openwebui_base_url}/api/models", 
-                                    headers=headers, timeout=10)
+                                    headers=headers, timeout=30)
                 
                 if response.status_code == 200:
                     data = response.json()

@@ -237,32 +237,43 @@ class CredentialManager:
             with open(self.credentials_file, 'r', encoding='utf-8') as f:
                 self.credentials = json.load(f)
 
-            # Offer to encrypt existing unencrypted file
-            result = messagebox.askyesno(
-                "Security Upgrade",
-                "Your credentials file is unencrypted.\n\n" +
-                "Would you like to encrypt it for better security?"
-            )
+            # Check if user has already declined encryption
+            declined_encryption = self.credentials.get('_settings', {}).get('declined_encryption', False)
 
-            if result:
-                password = self._prompt_for_new_password(parent_window)
-                if password:
-                    # Backup the unencrypted file before encrypting
-                    import shutil
-                    from datetime import datetime
-                    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-                    backup_path = f"{self.credentials_file}.unencrypted.backup.{timestamp}"
-                    try:
-                        shutil.copy2(self.credentials_file, backup_path)
-                        print(f"✓ Backed up unencrypted file to: {backup_path}")
-                    except Exception as e:
-                        print(f"⚠ Could not backup unencrypted file: {e}")
+            # Only offer to encrypt if user hasn't declined before
+            if not declined_encryption:
+                result = messagebox.askyesno(
+                    "Security Upgrade",
+                    "Your credentials file is unencrypted.\n\n" +
+                    "Would you like to encrypt it for better security?"
+                )
 
-                    self.is_encrypted = True
-                    self.save_credentials(password)
-                    messagebox.showinfo("Success",
-                        f"Credentials encrypted successfully!\n\n" +
-                        f"Original unencrypted file backed up to:\n{os.path.basename(backup_path)}")
+                if result:
+                    password = self._prompt_for_new_password(parent_window)
+                    if password:
+                        # Backup the unencrypted file before encrypting
+                        import shutil
+                        from datetime import datetime
+                        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                        backup_path = f"{self.credentials_file}.unencrypted.backup.{timestamp}"
+                        try:
+                            shutil.copy2(self.credentials_file, backup_path)
+                            print(f"✓ Backed up unencrypted file to: {backup_path}")
+                        except Exception as e:
+                            print(f"⚠ Could not backup unencrypted file: {e}")
+
+                        self.is_encrypted = True
+                        self.save_credentials(password)
+                        messagebox.showinfo("Success",
+                            f"Credentials encrypted successfully!\n\n" +
+                            f"Original unencrypted file backed up to:\n{os.path.basename(backup_path)}")
+                else:
+                    # User declined - remember this preference
+                    if '_settings' not in self.credentials:
+                        self.credentials['_settings'] = {}
+                    self.credentials['_settings']['declined_encryption'] = True
+                    self.save_credentials()
+                    print("✓ User declined encryption - won't ask again")
 
             return True
 
