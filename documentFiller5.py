@@ -1108,7 +1108,7 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
             self.update_status("Using default settings")
 
     def save_settings(self):
-        """Save current settings - to encrypted credentials if available, otherwise JSON"""
+        """Save current settings to JSON and last_document.txt (no password prompts)"""
         try:
             script_dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -1122,42 +1122,7 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
                             'name': col['name']
                         })
 
-            # Try to save to encrypted credentials if available
-            if self.credential_manager and self.credential_manager.is_encrypted:
-                try:
-                    self.update_status("Saving to encrypted credentials...")
-
-                    # Update credentials with current settings
-                    self.credential_manager.set_credential('openwebui', 'base_url', self.openwebui_base_url)
-                    self.credential_manager.set_credential('openwebui', 'api_key', self.openwebui_api_key)
-                    self.credential_manager.set_credential('openwebui', 'default_model', self.selected_model.get())
-                    self.credential_manager.set_credential('openwebui', 'temperature', self.temperature.get())
-                    self.credential_manager.set_credential('openwebui', 'max_tokens', self.max_tokens.get())
-                    self.credential_manager.set_credential('openwebui', 'knowledge_collections', saved_collections)
-                    self.credential_manager.set_credential('openwebui', 'last_used', datetime.now().isoformat())
-
-                    # Prompt for password to save
-                    from tkinter import simpledialog
-                    password = simpledialog.askstring(
-                        "Save Credentials",
-                        "Enter password to save encrypted credentials:",
-                        show='*',
-                        parent=self.root
-                    )
-
-                    if password:
-                        if self.credential_manager.save_credentials(password):
-                            self.update_status("Settings saved to encrypted credentials")
-                            print("✓ Settings saved to encrypted credentials")
-                            return
-                    else:
-                        self.update_status("Save cancelled")
-                        return
-                except Exception as e:
-                    print(f"Note: Could not save to encrypted credentials: {e}")
-                    self.update_status("Saving to JSON config instead...")
-
-            # Fall back to JSON config
+            # Save to JSON config (no password prompts for automatic saves)
             config_file = os.path.join(script_dir, "openwebui_config.json")
 
             config = {
@@ -1189,22 +1154,14 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
             with open(config_file, 'w') as f:
                 json.dump(config, f, indent=2)
 
+            # Save last document path for auto-load on next startup
             if self.document_path:
                 last_doc_file = os.path.join(script_dir, "last_document.txt")
                 with open(last_doc_file, 'w') as f:
                     f.write(self.document_path)
 
             self.update_status("Settings saved")
-                    
             self.log_message("Settings saved")
-            
-            if self.credential_manager and self.credential_manager.is_encrypted:
-                try:
-                    self.save_to_encrypted_credentials()
-                    self.log_message("✓ Also backed up to encrypted credentials")
-                except Exception as e:
-                    self.log_message(f"Note: Encrypted backup not saved: {e}")
-        
 
         except Exception as e:
             self.log_message(f"Error saving settings: {str(e)}")
@@ -3223,18 +3180,20 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
         thread.start()
         
     def generate_content_thread(self):
-        """Generate content in background thread with streaming"""
+        """Generate content in background thread (non-streaming with detailed status)"""
         try:
             self.generate_btn.config(state='disabled')
-            self.root.after(0, lambda: self.update_status(f"Preparing to generate content..."))
+            self.root.after(0, lambda: self.update_status("🔧 Preparing to generate content..."))
+            self.log_message("="*60)
+            self.log_message("Starting content generation")
 
             section = self.selected_section
             mode = self.operation_mode.get()
             existing_content = section.get_existing_content()
 
-            self.log_message(f"Generating content for: {section.get_full_path()}")
-            self.log_message(f"Mode: {mode}")
-            self.root.after(0, lambda: self.update_status(f"Building prompt for {section.text}..."))
+            self.log_message(f"📄 Section: {section.get_full_path()}")
+            self.log_message(f"⚙️  Mode: {mode}")
+            self.root.after(0, lambda: self.update_status(f"📝 Building prompt for '{section.text}'..."))
 
             # Build parent context
             parent_context = ""
@@ -3245,8 +3204,10 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
                     parent_path.insert(0, current.text)
                     current = current.parent
                 parent_context = " > ".join(parent_path)
+                self.log_message(f"📂 Parent context: {parent_context}")
 
             # Build prompt
+            self.log_message("🔨 Constructing prompt...")
             prompt = self.master_prompt.get()
             prompt = prompt.replace("{section_name}", section.text)
             prompt = prompt.replace("{parent_context}", parent_context if parent_context else "Root level")
@@ -3255,23 +3216,28 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
             # Add mode-specific instructions
             if mode == "replace":
                 prompt += "\n\nYour task: Write comprehensive content for this section from scratch."
+                self.log_message("📝 Mode: Replace (writing from scratch)")
             elif mode == "rework":
                 prompt += f"\n\nEXISTING CONTENT TO REWORK:\n{existing_content}\n\n"
                 prompt += "Your task: Rewrite and enhance the existing content."
+                self.log_message("♻️  Mode: Rework (enhancing existing content)")
             elif mode == "append":
                 prompt += f"\n\nEXISTING CONTENT:\n{existing_content}\n\n"
                 prompt += "Your task: Add additional relevant content."
+                self.log_message("➕ Mode: Append (adding to existing content)")
 
             # Add knowledge base instruction
             if self.selected_knowledge_collections and isinstance(self.selected_knowledge_collections, list):
                 collection_names = [col['name'] for col in self.selected_knowledge_collections if isinstance(col, dict) and 'name' in col]
                 if collection_names:
                     prompt += f"\n\nIMPORTANT: Reference knowledge base: {', '.join(collection_names)}"
+                    self.log_message(f"📚 Using knowledge collections: {', '.join(collection_names)}")
 
-            # NEW: Add external RAG content if available
+            # Add external RAG content if available
             external_content = self.get_external_rag_content()
             if external_content:
-                self.root.after(0, lambda: self.update_status("Adding external RAG content..."))
+                self.root.after(0, lambda: self.update_status("📦 Adding external RAG content..."))
+                self.log_message(f"📦 Adding {len(external_content[:10])} external RAG items...")
                 prompt += "\n\n" + "="*60 + "\n"
                 prompt += "ADDITIONAL REFERENCE CONTENT (External RAG):\n"
                 prompt += "="*60 + "\n"
@@ -3285,43 +3251,68 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
 
             # Store the prompt
             self.last_sent_prompt = prompt
+            prompt_length = len(prompt)
+            self.log_message(f"📊 Prompt size: {prompt_length} characters")
 
-            self.log_message("Sending request to OpenWebUI...")
-            self.root.after(0, lambda: self.update_status("Sending request to OpenWebUI..."))
+            # Send request
+            self.log_message("🚀 Sending request to OpenWebUI API...")
+            self.log_message(f"   Model: {self.selected_model.get()}")
+            self.log_message(f"   Temperature: {self.temperature.get()}")
+            self.log_message(f"   Max tokens: {self.max_tokens.get()}")
+            self.log_message(f"   Timeout: 300 seconds (5 minutes)")
+            self.root.after(0, lambda: self.update_status("🌐 Sending request to OpenWebUI..."))
 
-            # Initialize generated content
-            self.generated_content = ""
+            # Query OpenWebUI (non-streaming)
+            import time
+            start_time = time.time()
 
-            # Define streaming callback to update preview in real-time
-            def on_chunk(chunk):
-                """Handle each streaming chunk"""
-                self.generated_content += chunk
-                # Update preview in real-time
-                self.root.after(0, self.show_generated_content)
-                self.root.after(0, lambda: self.update_status("Receiving response..."))
+            self.root.after(0, lambda: self.update_status("⏳ Waiting for API response..."))
+            response = self.query_openwebui(prompt)
 
-            # Query OpenWebUI with streaming
-            response = self.query_openwebui_streaming(prompt, callback=on_chunk)
+            elapsed_time = time.time() - start_time
+            self.log_message(f"⏱️  Response received in {elapsed_time:.1f} seconds")
 
+            # Check response
             if response and not response.startswith("Error:"):
                 self.generated_content = response
+                response_length = len(response)
+                self.log_message(f"✅ Content generated successfully ({response_length} characters)")
                 self.root.after(0, self.show_generated_content)
-                self.root.after(0, lambda: self.update_status("Content generated successfully"))
-                self.log_message("Content generated successfully")
+                self.root.after(0, lambda: self.update_status("✅ Content generated successfully"))
+                self.log_message("="*60)
             else:
-                self.log_message(f"Generation failed: {response}")
-                self.root.after(0, lambda: self.update_status(f"Generation failed"))
+                error_details = response if response else "No response received"
+                self.log_message(f"❌ Generation failed: {error_details}")
+                self.root.after(0, lambda: self.update_status(f"❌ Generation failed: {error_details}"))
                 self.root.after(0, self.handle_generation_error)
+                self.log_message("="*60)
 
-        except Exception as e:
-            self.log_message(f"Error generating content: {str(e)}")
-            self.root.after(0, lambda: self.update_status(f"Error: {str(e)}"))
+        except requests.exceptions.Timeout:
+            timeout_msg = "Request timed out after 300 seconds (5 minutes)"
+            self.log_message(f"⏰ TIMEOUT: {timeout_msg}")
+            self.root.after(0, lambda: self.update_status(f"⏰ Timeout: {timeout_msg}"))
             self.root.after(0, self.handle_generation_error)
+            self.log_message("="*60)
+        except requests.exceptions.ConnectionError as e:
+            conn_msg = f"Connection error: {str(e)}"
+            self.log_message(f"🔌 CONNECTION ERROR: {conn_msg}")
+            self.root.after(0, lambda: self.update_status(f"🔌 {conn_msg}"))
+            self.root.after(0, self.handle_generation_error)
+            self.log_message("="*60)
+        except Exception as e:
+            error_msg = f"Unexpected error: {str(e)}"
+            self.log_message(f"❌ ERROR: {error_msg}")
+            self.root.after(0, lambda: self.update_status(f"❌ {error_msg}"))
+            self.root.after(0, self.handle_generation_error)
+            self.log_message("="*60)
+            import traceback
+            self.log_message(traceback.format_exc())
         finally:
+            self.log_message("🔄 Re-enabling generate button...")
             self.root.after(0, lambda: self.generate_btn.config(state='normal'))
             
     def query_openwebui(self, prompt):
-        """Query OpenWebUI API"""
+        """Query OpenWebUI API (non-streaming with detailed error handling)"""
         try:
             if self.content_processor and self.document and self.selected_section:
                 try:
@@ -3366,10 +3357,13 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
                     if isinstance(col, dict) and 'id' in col
                 ]
 
+            self.log_message(f"📡 Connecting to {self.openwebui_base_url}...")
             response = requests.post(
                 f"{self.openwebui_base_url}/api/chat/completions",
                 headers=headers, json=payload, timeout=300
             )
+
+            self.log_message(f"📨 Response status: {response.status_code}")
 
             if response.status_code == 200:
                 result = response.json()
@@ -3384,17 +3378,37 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
                     self.log_prompt_history(response_content, response_content, is_sent=False)
                     return response_content
                 else:
-                    error_msg = "Error: No content in response"
+                    error_msg = "Error: No content in response (response format unexpected)"
+                    self.log_message(f"⚠️  {error_msg}")
                     self.log_prompt_history(error_msg, error_msg, is_sent=False)
                     return error_msg
             else:
-                error_msg = f"Error: HTTP {response.status_code} - {response.text}"
+                error_msg = f"Error: HTTP {response.status_code} - {response.text[:200]}"
+                self.log_message(f"❌ {error_msg}")
                 self.log_prompt_history(error_msg, error_msg, is_sent=False)
                 return error_msg
 
-        except Exception as e:
-            error_msg = f"Error: {str(e)}"
+        except requests.exceptions.Timeout:
+            error_msg = "Error: Request timed out after 300 seconds (5 minutes)"
+            self.log_message(f"⏰ {error_msg}")
             self.log_prompt_history(error_msg, error_msg, is_sent=False)
+            return error_msg
+        except requests.exceptions.ConnectionError as e:
+            error_msg = f"Error: Connection failed - {str(e)}"
+            self.log_message(f"🔌 {error_msg}")
+            self.log_prompt_history(error_msg, error_msg, is_sent=False)
+            return error_msg
+        except requests.exceptions.RequestException as e:
+            error_msg = f"Error: Request failed - {str(e)}"
+            self.log_message(f"❌ {error_msg}")
+            self.log_prompt_history(error_msg, error_msg, is_sent=False)
+            return error_msg
+        except Exception as e:
+            error_msg = f"Error: Unexpected error - {str(e)}"
+            self.log_message(f"❌ {error_msg}")
+            self.log_prompt_history(error_msg, error_msg, is_sent=False)
+            import traceback
+            self.log_message(traceback.format_exc())
             return error_msg
 
     def query_openwebui_streaming(self, prompt, callback=None):
