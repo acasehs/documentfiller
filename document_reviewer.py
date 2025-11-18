@@ -371,7 +371,7 @@ class TechnicalDocumentReviewer:
                     "temperature": 0.3,
                     "max_tokens": 2000
                 },
-                timeout=30
+                timeout=300  # 5 minutes for comprehensive review
             )
             
             if response.status_code == 200:
@@ -466,7 +466,7 @@ class TechnicalDocumentReviewer:
                     "temperature": 0.2,
                     "max_tokens": 1000
                 },
-                timeout=20
+                timeout=60  # 1 minute for comment analysis
             )
             
             if response.status_code == 200:
@@ -571,7 +571,7 @@ class TechnicalDocumentReviewer:
                     "temperature": 0.4,
                     "max_tokens": 1500
                 },
-                timeout=25
+                timeout=120  # 2 minutes for content generation
             )
             
             if response.status_code == 200:

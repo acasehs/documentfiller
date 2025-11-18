@@ -3547,93 +3547,6 @@ Rewritten text with consistent {target_tense} tense:"""
             self.log_message(traceback.format_exc())
             return error_msg
 
-    def query_openwebui_streaming(self, prompt, callback=None):
-        """Query OpenWebUI API with streaming support"""
-        try:
-            if self.content_processor and self.document and self.selected_section:
-                try:
-                    full_content = self.selected_section.get_existing_content()
-                    if len(full_content) > 100:
-                        strategy_result = self.content_processor.determine_processing_strategy(
-                            full_content, [self.selected_section], prompt
-                        )
-
-                        self.log_message(f"📊 Processing Strategy: {strategy_result.method} - {strategy_result.reason}")
-
-                        if strategy_result.method == "rag" and self.document_path:
-                            context, chunks = self.content_processor.build_rag_context(
-                                prompt, self.document_path, [self.selected_section]
-                            )
-                            if context and len(chunks) > 0:
-                                prompt = f"RELEVANT CONTEXT FROM DOCUMENT:\n{context}\n\n===\n\nORIGINAL QUERY:\n{prompt}"
-                                self.log_message(f"✓ Enhanced with RAG context ({len(chunks)} chunks)")
-                except Exception as e:
-                    self.log_message(f"Note: Could not apply intelligent processing: {e}")
-
-            # Log the prompt to history first
-            self.log_prompt_history(prompt, is_sent=True)
-
-            headers = {
-                'Authorization': f'Bearer {self.openwebui_api_key}',
-                'Content-Type': 'application/json'
-            }
-
-            payload = {
-                "model": self.selected_model.get(),
-                "messages": [{"role": "user", "content": prompt}],
-                "stream": True,
-                "temperature": self.temperature.get(),
-                "max_tokens": self.max_tokens.get()
-            }
-
-            if self.selected_knowledge_collections and isinstance(self.selected_knowledge_collections, list):
-                payload["files"] = [
-                    {"type": "collection", "id": col['id']}
-                    for col in self.selected_knowledge_collections
-                    if isinstance(col, dict) and 'id' in col
-                ]
-
-            response = requests.post(
-                f"{self.openwebui_base_url}/api/chat/completions",
-                headers=headers, json=payload, timeout=300, stream=True
-            )
-
-            if response.status_code == 200:
-                full_response = ""
-                for line in response.iter_lines():
-                    if line:
-                        line = line.decode('utf-8')
-                        if line.startswith('data: '):
-                            line = line[6:]  # Remove 'data: ' prefix
-
-                        if line == '[DONE]':
-                            break
-
-                        try:
-                            chunk = json.loads(line)
-                            if 'choices' in chunk and len(chunk['choices']) > 0:
-                                delta = chunk['choices'][0].get('delta', {})
-                                content = delta.get('content', '')
-                                if content:
-                                    full_response += content
-                                    if callback:
-                                        callback(content)
-                        except json.JSONDecodeError:
-                            continue
-
-                # Log the complete response to history
-                self.log_prompt_history(full_response, full_response, is_sent=False)
-                return full_response
-            else:
-                error_msg = f"Error: HTTP {response.status_code} - {response.text}"
-                self.log_prompt_history(error_msg, error_msg, is_sent=False)
-                return error_msg
-
-        except Exception as e:
-            error_msg = f"Error: {str(e)}"
-            self.log_prompt_history(error_msg, error_msg, is_sent=False)
-            return error_msg
-
     def query_openwebui_with_model(self, prompt, model):
         """Query OpenWebUI API with specific model"""
         try:
@@ -8068,14 +7981,22 @@ Previous conversation:
         thread.start()
 
     def perform_whole_document_review(self):
-        """Perform whole document review in background thread"""
+        """Perform whole document review in background thread with intelligent RAG support"""
         try:
+            import time
+
+            self.log_message("="*60)
+            self.log_message("WHOLE DOCUMENT REVIEW")
+            self.log_message("="*60)
+
             # Collect all sections with content
             sections_with_content = [s for s in self.sections if s.has_content()]
 
             if not sections_with_content:
                 self.root.after(0, lambda: messagebox.showinfo("No Content", "No sections have content to review"))
                 return
+
+            self.log_message(f"📄 Sections to review: {len(sections_with_content)}")
 
             # Build comprehensive document content
             full_document = ""
@@ -8084,6 +8005,9 @@ Previous conversation:
                 full_document += f"SECTION: {section.get_full_path()}\n"
                 full_document += f"{'='*60}\n\n"
                 full_document += section.get_existing_content()
+
+            doc_size = len(full_document)
+            self.log_message(f"📊 Document size: {doc_size:,} characters")
 
             # Build review prompt
             review_prompt = """You are an expert technical writer reviewing a complete document for quality, cohesion, and clarity.
@@ -8112,22 +8036,103 @@ Also identify:
 DOCUMENT TO REVIEW:
 """ + full_document
 
-            self.log_message("Sending document to AI for comprehensive review...")
+            # Check if we should use RAG for large documents
+            if self.content_processor and self.document_path and doc_size > 100000:
+                self.log_message("📚 Document is large - using intelligent RAG processing...")
 
-            # Query AI
+                try:
+                    # Use content processor to determine best strategy
+                    strategy_result = self.content_processor.determine_processing_strategy(
+                        full_document, sections_with_content, review_prompt
+                    )
+
+                    self.log_message(f"🤖 Processing Strategy: {strategy_result.method}")
+                    self.log_message(f"   Reason: {strategy_result.reason}")
+
+                    if strategy_result.method == "rag":
+                        # Build RAG context from document
+                        context, chunks = self.content_processor.build_rag_context(
+                            review_prompt, self.document_path, sections_with_content
+                        )
+
+                        if context and len(chunks) > 0:
+                            self.log_message(f"✓ Enhanced with RAG context ({len(chunks)} relevant chunks)")
+                            # Replace full document with RAG context
+                            review_prompt = """You are an expert technical writer reviewing a complete document for quality, cohesion, and clarity.
+
+REVIEW THE DOCUMENT and provide a comprehensive analysis based on the relevant sections below.
+
+Evaluate:
+1. **Overall Cohesion** (1-10): Does the document flow logically? Are sections well-connected?
+2. **Clarity** (1-10): Is the writing clear and understandable throughout?
+3. **Technical Accuracy** (1-10): Are technical details accurate and appropriate?
+4. **Completeness** (1-10): Does the document cover all necessary topics comprehensively?
+5. **Consistency** (1-10): Is terminology, style, and tone consistent across sections?
+
+For each criterion:
+- Provide a score (1-10)
+- List specific issues or concerns
+- Provide recommendations for improvement
+
+Also identify:
+- Sections that are particularly strong
+- Sections that need significant improvement
+- Any gaps or missing information
+- Any redundancy or unnecessary repetition
+- Transitions that could be improved
+
+RELEVANT DOCUMENT SECTIONS:
+""" + context
+                        else:
+                            self.log_message("⚠ RAG context generation failed - using full document")
+                except Exception as e:
+                    self.log_message(f"⚠ Could not apply RAG processing: {e}")
+                    self.log_message("   Falling back to full document review")
+            elif doc_size > 100000:
+                self.log_message(f"⚠ Large document ({doc_size:,} chars) but RAG not available")
+                self.log_message("   Consider enabling intelligent processing for better results")
+
+            self.log_message("🚀 Sending to OpenWebUI API for review...")
+            self.log_message(f"   Model: {self.selected_model.get()}")
+            self.log_message(f"   Temperature: {self.temperature.get()}")
+            self.log_message(f"   Timeout: 300 seconds (5 minutes)")
+            self.root.after(0, lambda: self.update_status("⏳ Waiting for review response..."))
+
+            # Query AI with timing
+            start_time = time.time()
             response = self.query_openwebui(review_prompt)
+            elapsed_time = time.time() - start_time
+
+            self.log_message(f"⏱️  Response received in {elapsed_time:.1f} seconds")
 
             if response and not response.startswith("Error:"):
                 # Display results
+                self.log_message(f"✅ Whole document review completed ({len(response)} characters)")
                 self.root.after(0, lambda: self.show_document_review_results(response, sections_with_content))
-                self.log_message("✓ Whole document review completed")
+                self.root.after(0, lambda: self.update_status("Review completed"))
             else:
-                self.log_message(f"Review failed: {response}")
+                self.log_message(f"❌ Review failed: {response}")
                 self.root.after(0, lambda: messagebox.showerror("Error", f"Review failed: {response}"))
+                self.root.after(0, lambda: self.update_status("Review failed"))
 
+            self.log_message("="*60)
+
+        except requests.exceptions.Timeout:
+            timeout_msg = "Review timed out after 300 seconds (5 minutes)"
+            self.log_message(f"⏰ TIMEOUT: {timeout_msg}")
+            self.root.after(0, lambda: messagebox.showerror("Timeout", timeout_msg))
+            self.root.after(0, lambda: self.update_status("Review timed out"))
+        except requests.exceptions.ConnectionError as e:
+            error_msg = f"Connection failed: {str(e)}"
+            self.log_message(f"🔌 CONNECTION ERROR: {error_msg}")
+            self.root.after(0, lambda: messagebox.showerror("Connection Error", error_msg))
+            self.root.after(0, lambda: self.update_status("Connection error"))
         except Exception as e:
-            self.log_message(f"Review error: {str(e)}")
+            self.log_message(f"❌ Review error: {str(e)}")
+            import traceback
+            self.log_message(traceback.format_exc())
             self.root.after(0, lambda: messagebox.showerror("Error", f"Review failed: {str(e)}"))
+            self.root.after(0, lambda: self.update_status("Review error"))
 
     def show_document_review_results(self, review_content, sections):
         """Display whole document review results"""
