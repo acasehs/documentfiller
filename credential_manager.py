@@ -114,6 +114,7 @@ class CredentialManager:
                 "temperature": 0.1,
                 "max_tokens": 8000,
                 "knowledge_collections": [],  # Store selected knowledge collections
+                "master_prompt": "",  # Master prompt template for document generation
                 "last_used": None  # Timestamp of last use
             },
             "document_review": {
@@ -126,6 +127,22 @@ class CredentialManager:
                 "rag_threshold": 10000,  # chars - above this use RAG, below use full prompt
                 "auto_tense_correction": False,
                 "backup_encrypted": True
+            },
+            "format_config": {
+                "highlight_enabled": True,
+                "highlight_color": "YELLOW",
+                "bold_enabled": False,
+                "italic_enabled": False,
+                "underline_enabled": False,
+                "font_color": "000000",
+                "font_size": 11
+            },
+            "auto_config": {
+                "auto_backup": True,
+                "backup_interval": 5,
+                "auto_save": False,
+                "auto_reload": True,
+                "ask_backup": True
             },
             "last_credential_file": None  # Track which credential file was last used
         }
@@ -420,4 +437,68 @@ class CredentialManager:
         except Exception as e:
             messagebox.showerror("Load Error", f"Failed to load credentials: {str(e)}")
             self.credentials_file = original_file
+            return False
+
+    def migrate_from_json_config(self, json_config_path, silent=False):
+        """
+        Migrate settings from openwebui_config.json to encrypted credentials
+
+        Args:
+            json_config_path: Path to the JSON config file
+            silent: If True, don't show success message
+
+        Returns:
+            True if migration successful, False otherwise
+        """
+        if not os.path.exists(json_config_path):
+            if not silent:
+                print(f"No JSON config file found at: {json_config_path}")
+            return False
+
+        try:
+            with open(json_config_path, 'r', encoding='utf-8') as f:
+                json_config = json.load(f)
+
+            # Map JSON config to credential structure
+            if "base_url" in json_config:
+                self.set_credential('openwebui', 'base_url', json_config['base_url'])
+
+            if "api_key" in json_config:
+                self.set_credential('openwebui', 'api_key', json_config['api_key'])
+
+            if "model" in json_config:
+                self.set_credential('openwebui', 'default_model', json_config['model'])
+
+            if "temperature" in json_config:
+                self.set_credential('openwebui', 'temperature', json_config['temperature'])
+
+            if "max_tokens" in json_config:
+                self.set_credential('openwebui', 'max_tokens', json_config['max_tokens'])
+
+            if "knowledge_collections" in json_config:
+                self.set_credential('openwebui', 'knowledge_collections', json_config['knowledge_collections'])
+
+            if "master_prompt" in json_config:
+                self.set_credential('openwebui', 'master_prompt', json_config['master_prompt'])
+
+            # Migrate format_config as a whole section
+            if "format_config" in json_config:
+                if 'format_config' not in self.credentials:
+                    self.credentials['format_config'] = {}
+                self.credentials['format_config'].update(json_config['format_config'])
+
+            # Migrate auto_config as a whole section
+            if "auto_config" in json_config:
+                if 'auto_config' not in self.credentials:
+                    self.credentials['auto_config'] = {}
+                self.credentials['auto_config'].update(json_config['auto_config'])
+
+            if not silent:
+                print(f"✓ Successfully migrated settings from {os.path.basename(json_config_path)}")
+
+            return True
+
+        except Exception as e:
+            if not silent:
+                print(f"⚠ Failed to migrate JSON config: {str(e)}")
             return False
