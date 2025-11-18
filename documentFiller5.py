@@ -243,7 +243,10 @@ class DocxDocumentFiller:
         # Section tracking
         self.section_tracking = {}
         self.tracking_file = None
-        
+
+        # Modal window tracking (prevent duplicates)
+        self.open_modals = {}
+
         # OpenWebUI configuration
         self.openwebui_base_url = "http://172.16.27.122:3000"
         self.openwebui_api_key = ""
@@ -1712,71 +1715,73 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
         ttk.Radiobutton(op_frame, text="Append (add to existing)", 
                     variable=self.operation_mode, value="append").pack(anchor=tk.W)
         
-        # Action buttons - Reduced padding
-        button_frame = ttk.Frame(left_panel)
-        button_frame.grid(row=3, column=0, sticky=(tk.W, tk.E))
+        # Action buttons - Tabbed interface
+        button_notebook = ttk.Notebook(left_panel)
+        button_notebook.grid(row=3, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
 
-        # Reduced padding for all buttons
-        btn_pady = (0, 5)
+        # Configure minimal button styling
+        btn_pady = (0, 3)  # Reduced padding
+        btn_style = {'font': ('Arial', 9)}  # Smaller font
 
-        # ===== SECTION-LEVEL OPERATIONS =====
-        section_label = tk.Label(button_frame, text="SECTION OPERATIONS",
-                                bg="#1e1e1e", fg="#888888", font=("Arial", 8, "bold"))
-        section_label.pack(fill=tk.X, pady=(0, 5))
+        # ===== SECTION TAB =====
+        section_frame = ttk.Frame(button_notebook, padding="5")
+        button_notebook.add(section_frame, text="Section")
 
-        self.generate_btn = ttk.Button(button_frame, text="Generate Content",
+        self.generate_btn = ttk.Button(section_frame, text="Generate Content",
                                     command=self.generate_content, state='disabled')
         self.generate_btn.pack(fill=tk.X, pady=btn_pady)
 
-        self.review_btn = ttk.Button(button_frame, text="📝 Review Section",
+        self.review_btn = ttk.Button(section_frame, text="📝 Review",
                                     command=self.conduct_section_review, state='disabled')
         self.review_btn.pack(fill=tk.X, pady=btn_pady)
 
-        self.tense_btn = ttk.Button(button_frame, text="🎯 Analyze Tenses",
+        self.tense_btn = ttk.Button(section_frame, text="🎯 Analyze Tenses",
                                     command=self.analyze_document_tenses, state='disabled')
         self.tense_btn.pack(fill=tk.X, pady=btn_pady)
 
-        self.check_fix_section_tenses_btn = ttk.Button(button_frame, text="✏️ Check & Fix Tenses",
+        self.check_fix_section_tenses_btn = ttk.Button(section_frame, text="✏️ Check & Fix Tenses",
                                                command=self.check_and_fix_section_tenses, state='disabled')
         self.check_fix_section_tenses_btn.pack(fill=tk.X, pady=btn_pady)
 
-        self.apply_suggestions_btn = ttk.Button(button_frame, text="✅ Apply Suggestions",
+        self.apply_suggestions_btn = ttk.Button(section_frame, text="✅ Apply Suggestions",
                                             command=self.apply_review_suggestions,
                                             state='disabled')
         self.apply_suggestions_btn.pack(fill=tk.X, pady=btn_pady)
 
-        self.regenerate_from_review_btn = ttk.Button(button_frame, text="🔄 Regenerate Review",
+        self.regenerate_from_review_btn = ttk.Button(section_frame, text="🔄 Regenerate",
                                                     command=self.regenerate_from_review,
                                                     state='disabled')
         self.regenerate_from_review_btn.pack(fill=tk.X, pady=btn_pady)
 
-        # Separator
-        ttk.Separator(button_frame, orient='horizontal').pack(fill=tk.X, pady=10)
+        ttk.Separator(section_frame, orient='horizontal').pack(fill=tk.X, pady=8)
 
-        # ===== DOCUMENT-LEVEL OPERATIONS =====
-        document_label = tk.Label(button_frame, text="DOCUMENT OPERATIONS",
-                                 bg="#1e1e1e", fg="#888888", font=("Arial", 8, "bold"))
-        document_label.pack(fill=tk.X, pady=(0, 5))
+        ttk.Button(section_frame, text="🧠 Processing Strategy",
+                command=lambda: self.show_processing_strategy_dialog(scope="section")).pack(fill=tk.X, pady=btn_pady)
 
-        ttk.Button(button_frame, text="📋 Review Document",
+        # ===== DOCUMENT TAB =====
+        document_frame = ttk.Frame(button_notebook, padding="5")
+        button_notebook.add(document_frame, text="Document")
+
+        ttk.Button(document_frame, text="📋 Review Document",
                 command=self.review_whole_document).pack(fill=tk.X, pady=btn_pady)
 
-        ttk.Button(button_frame, text="✏️ Check & Fix Document Tenses",
+        ttk.Button(document_frame, text="✏️ Check & Fix Tenses",
                 command=self.check_and_fix_document_tenses).pack(fill=tk.X, pady=btn_pady)
 
-        ttk.Button(button_frame, text="🚀 Auto Complete",
+        ttk.Button(document_frame, text="🚀 Auto Complete",
                 command=self.auto_complete_document).pack(fill=tk.X, pady=btn_pady)
 
-        # Separator
-        ttk.Separator(button_frame, orient='horizontal').pack(fill=tk.X, pady=10)
+        ttk.Separator(document_frame, orient='horizontal').pack(fill=tk.X, pady=8)
 
-        # ===== UTILITIES =====
-        utilities_label = tk.Label(button_frame, text="UTILITIES",
-                                  bg="#1e1e1e", fg="#888888", font=("Arial", 8, "bold"))
-        utilities_label.pack(fill=tk.X, pady=(0, 5))
+        ttk.Button(document_frame, text="🧠 Processing Strategy",
+                command=lambda: self.show_processing_strategy_dialog(scope="document")).pack(fill=tk.X, pady=btn_pady)
 
-        ttk.Button(button_frame, text="🧠 Processing Strategy",
-                command=self.show_processing_strategy_dialog).pack(fill=tk.X, pady=btn_pady)
+        # ===== UTILITIES TAB =====
+        utilities_frame = ttk.Frame(button_notebook, padding="5")
+        button_notebook.add(utilities_frame, text="Utilities")
+
+        ttk.Button(utilities_frame, text="📚 Manage Prompts",
+                command=self.open_prompt_manager).pack(fill=tk.X, pady=btn_pady)
         
         # Right panel
         right_panel = ttk.Frame(content_frame)
@@ -2082,6 +2087,13 @@ Rewritten text with consistent {target_tense} tense:"""
 
     def _show_tense_fix_dialog(self, tense_analysis, scope="section"):
         """Display tense analysis results with options to fix"""
+        # Prevent duplicate modal
+        modal_key = f'tense_fix_{scope}'
+        if modal_key in self.open_modals and self.open_modals[modal_key].winfo_exists():
+            self.open_modals[modal_key].lift()
+            self.open_modals[modal_key].focus_force()
+            return
+
         dialog = tk.Toplevel(self.root)
         dialog.title("Check & Fix Tenses")
         dialog.geometry("800x600")
@@ -2090,6 +2102,10 @@ Rewritten text with consistent {target_tense} tense:"""
         # Make dialog modal
         dialog.transient(self.root)
         dialog.grab_set()
+
+        # Track this modal
+        self.open_modals[modal_key] = dialog
+        dialog.protocol("WM_DELETE_WINDOW", lambda: self._close_modal(dialog, modal_key))
 
         # Main container with padding
         main_frame = tk.Frame(dialog, bg="#2b2b2b")
@@ -2204,10 +2220,8 @@ Rewritten text with consistent {target_tense} tense:"""
         future_btn.pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
 
         # Close button
-        close_btn = ttk.Button(fix_frame, text="Close", command=dialog.destroy)
+        close_btn = ttk.Button(fix_frame, text="Close", command=lambda: self._close_modal(dialog, modal_key))
         close_btn.pack(pady=10)
-        close_btn = ttk.Button(fix_frame, text="Close", command=dialog.destroy)
-        close_btn.pack(pady=(10, 0))
 
         self.log_message(f"Tense analysis completed: {tense_analysis.consistency_score:.1f}/10")
 
@@ -3233,11 +3247,21 @@ Rewritten text with consistent {target_tense} tense:"""
 
     def open_config_dialog(self):
         """Open OpenWebUI AI configuration dialog - COMPACT LAYOUT"""
+        # Prevent duplicate modal
+        if 'config_dialog' in self.open_modals and self.open_modals['config_dialog'].winfo_exists():
+            self.open_modals['config_dialog'].lift()
+            self.open_modals['config_dialog'].focus_force()
+            return
+
         config_window = tk.Toplevel(self.root)
         config_window.title("OpenWebUI AI Configuration")
         config_window.geometry("700x700")
         config_window.configure(bg="#2b2b2b")
         config_window.grab_set()
+
+        # Track this modal
+        self.open_modals['config_dialog'] = config_window
+        config_window.protocol("WM_DELETE_WINDOW", lambda: self._close_modal(config_window, 'config_dialog'))
 
         main_frame = ttk.Frame(config_window, padding="15")
         main_frame.pack(fill=tk.BOTH, expand=True)
@@ -3347,7 +3371,7 @@ Rewritten text with consistent {target_tense} tense:"""
             if self.content_processor or self.advanced_reviewer:
                 self.refresh_advanced_modules()
 
-            config_window.destroy()
+            self._close_modal(config_window, 'config_dialog')
 
         # Left side buttons (Load, Save As)
         ttk.Button(btn_frame, text="Load", command=self.browse_config_file).pack(side=tk.LEFT, padx=(0, 5))
@@ -3355,7 +3379,7 @@ Rewritten text with consistent {target_tense} tense:"""
 
         # Right side buttons (Cancel, Save)
         ttk.Button(btn_frame, text="Save", command=save_and_close).pack(side=tk.RIGHT, padx=(5, 0))
-        ttk.Button(btn_frame, text="Cancel", command=config_window.destroy).pack(side=tk.RIGHT)
+        ttk.Button(btn_frame, text="Cancel", command=lambda: self._close_modal(config_window, 'config_dialog')).pack(side=tk.RIGHT)
         
         # Auto-refresh on load
         # Use after to let the dialog render first
@@ -3805,7 +3829,366 @@ Rewritten text with consistent {target_tense} tense:"""
         
         ttk.Button(btn_frame, text="Reset to Default", command=reset_prompt).pack(side=tk.LEFT)
         ttk.Button(btn_frame, text="Cancel", command=editor_window.destroy).pack(side=tk.RIGHT)
-        ttk.Button(btn_frame, text="Save", command=save_prompt).pack(side=tk.RIGHT, padx=(0, 5))            
+        ttk.Button(btn_frame, text="Save", command=save_prompt).pack(side=tk.RIGHT, padx=(0, 5))
+
+    def open_prompt_manager(self):
+        """Consolidated prompt manager - edit master prompt & manage library"""
+        # Prevent duplicate modal
+        if 'prompt_manager' in self.open_modals and self.open_modals['prompt_manager'].winfo_exists():
+            self.open_modals['prompt_manager'].lift()
+            self.open_modals['prompt_manager'].focus_force()
+            return
+
+        manager_window = tk.Toplevel(self.root)
+        manager_window.title("Prompt Manager")
+        manager_window.geometry("1000x700")
+        manager_window.configure(bg="#2b2b2b")
+        manager_window.grab_set()
+
+        # Track this modal
+        self.open_modals['prompt_manager'] = manager_window
+        manager_window.protocol("WM_DELETE_WINDOW", lambda: self._close_modal(manager_window, 'prompt_manager'))
+
+        main_frame = ttk.Frame(manager_window, padding="20")
+        main_frame.pack(fill=tk.BOTH, expand=True)
+
+        ttk.Label(main_frame, text="Prompt Manager",
+                font=("Arial", 14, "bold")).pack(anchor=tk.W, pady=(0, 10))
+
+        info_label = ttk.Label(main_frame,
+                            text="Variables: {section_name}, {parent_context}, {operation_mode}",
+                            foreground="#888888")
+        info_label.pack(anchor=tk.W, pady=(0, 15))
+
+        # Create split view
+        pane = ttk.PanedWindow(main_frame, orient=tk.HORIZONTAL)
+        pane.pack(fill=tk.BOTH, expand=True, pady=(0, 15))
+
+        # Left panel - prompt library list
+        left_frame = ttk.Frame(pane, width=280)
+        pane.add(left_frame, weight=0)
+
+        ttk.Label(left_frame, text="Prompt Library:").pack(anchor=tk.W, pady=(0, 5))
+
+        # Prompt list with scrollbar
+        list_frame = ttk.Frame(left_frame)
+        list_frame.pack(fill=tk.BOTH, expand=True)
+
+        list_scrollbar = ttk.Scrollbar(list_frame)
+        list_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        prompt_list = tk.Listbox(list_frame, yscrollcommand=list_scrollbar.set,
+                                bg="#1e1e1e", fg="#ffffff", font=("Consolas", 10),
+                                width=30)
+        prompt_list.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        list_scrollbar.config(command=prompt_list.yview)
+
+        # Buttons for list operations
+        list_btn_frame = ttk.Frame(left_frame)
+        list_btn_frame.pack(fill=tk.X, pady=(5, 0))
+
+        ttk.Button(list_btn_frame, text="Import",
+                command=lambda: self._pm_import_prompt(prompt_list, prompt_text, master_indicator)).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(list_btn_frame, text="Remove",
+                command=lambda: self._pm_remove_prompt(prompt_list, prompt_text, master_indicator)).pack(side=tk.LEFT)
+
+        # Right panel - prompt editor
+        right_frame = ttk.Frame(pane)
+        pane.add(right_frame, weight=3)
+
+        # Header with master indicator
+        header_frame = ttk.Frame(right_frame)
+        header_frame.pack(fill=tk.X, pady=(0, 5))
+
+        ttk.Label(header_frame, text="Prompt Editor:").pack(side=tk.LEFT)
+        master_indicator = ttk.Label(header_frame, text="", foreground="#4CAF50", font=("Arial", 10, "bold"))
+        master_indicator.pack(side=tk.LEFT, padx=(10, 0))
+
+        # Editable text area
+        text_frame = ttk.Frame(right_frame)
+        text_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
+
+        prompt_text = scrolledtext.ScrolledText(text_frame, height=25,
+                                                bg="#1e1e1e", fg="#ffffff",
+                                                font=("Consolas", 10), wrap=tk.WORD)
+        prompt_text.pack(fill=tk.BOTH, expand=True)
+        prompt_text.config(insertbackground="#ffffff")
+        prompt_text.config(selectbackground="#3a5f8f")
+        prompt_text.config(selectforeground="#ffffff")
+
+        # Editor action buttons
+        editor_btn_frame = ttk.Frame(right_frame)
+        editor_btn_frame.pack(fill=tk.X)
+
+        ttk.Button(editor_btn_frame, text="Save Changes",
+                command=lambda: self._pm_save_changes(prompt_list, prompt_text, master_indicator)).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(editor_btn_frame, text="Make Master",
+                command=lambda: self._pm_make_master(prompt_list, prompt_text, master_indicator)).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(editor_btn_frame, text="Save to Library",
+                command=lambda: self._pm_save_to_library(prompt_list, prompt_text, master_indicator)).pack(side=tk.LEFT)
+
+        # Bottom buttons
+        bottom_frame = ttk.Frame(main_frame)
+        bottom_frame.pack(fill=tk.X, pady=(10, 0))
+
+        ttk.Button(bottom_frame, text="Reset to Default",
+                command=lambda: self._pm_reset_to_default(prompt_text, master_indicator)).pack(side=tk.LEFT)
+        ttk.Button(bottom_frame, text="Close",
+                command=lambda: self._close_modal(manager_window, 'prompt_manager')).pack(side=tk.RIGHT)
+
+        # Load library and select master
+        self._pm_load_library(prompt_list, prompt_text, master_indicator)
+
+        # Bind selection event
+        prompt_list.bind('<<ListboxSelect>>',
+                        lambda e: self._pm_on_select(prompt_list, prompt_text, master_indicator))
+
+    def _close_modal(self, window, modal_key):
+        """Close modal and remove from tracking"""
+        if modal_key in self.open_modals:
+            del self.open_modals[modal_key]
+        window.destroy()
+
+    def _pm_load_library(self, listbox, text_widget, indicator):
+        """Load prompt library and auto-select master"""
+        listbox.delete(0, tk.END)
+
+        try:
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            library_dir = os.path.join(script_dir, "prompt_library")
+
+            if not os.path.exists(library_dir):
+                os.makedirs(library_dir)
+
+            # Track prompts and find master
+            current_master = self.master_prompt.get().strip()
+            master_index = None
+
+            for idx, filename in enumerate(sorted(os.listdir(library_dir))):
+                if filename.endswith('.txt'):
+                    display_name = os.path.splitext(filename)[0]
+
+                    # Check if this is the master prompt
+                    file_path = os.path.join(library_dir, filename)
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        content = f.read().strip()
+
+                    # Mark master with star
+                    if content == current_master:
+                        display_name = "⭐ " + display_name
+                        master_index = idx
+
+                    listbox.insert(tk.END, display_name)
+
+            # Select master if found, otherwise first item
+            if listbox.size() > 0:
+                select_idx = master_index if master_index is not None else 0
+                listbox.selection_set(select_idx)
+                listbox.see(select_idx)
+                self._pm_on_select(listbox, text_widget, indicator)
+
+        except Exception as e:
+            self.log_message(f"Error loading prompt library: {str(e)}")
+
+    def _pm_on_select(self, listbox, text_widget, indicator):
+        """Handle selection change in prompt list"""
+        try:
+            if not listbox.curselection():
+                return
+
+            index = listbox.curselection()[0]
+            display_name = listbox.get(index)
+
+            # Remove star prefix if present
+            clean_name = display_name.replace("⭐ ", "")
+
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            library_dir = os.path.join(script_dir, "prompt_library")
+            file_path = os.path.join(library_dir, clean_name + ".txt")
+
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+
+            text_widget.delete('1.0', tk.END)
+            text_widget.insert('1.0', content)
+
+            # Update master indicator
+            if display_name.startswith("⭐"):
+                indicator.config(text="★ MASTER PROMPT")
+            else:
+                indicator.config(text="")
+
+        except Exception as e:
+            self.log_message(f"Error loading prompt: {str(e)}")
+
+    def _pm_save_changes(self, listbox, text_widget, indicator):
+        """Save changes to the selected prompt file"""
+        try:
+            if not listbox.curselection():
+                messagebox.showinfo("Info", "Please select a prompt to save.")
+                return
+
+            index = listbox.curselection()[0]
+            display_name = listbox.get(index).replace("⭐ ", "")
+            content = text_widget.get('1.0', tk.END).strip()
+
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            library_dir = os.path.join(script_dir, "prompt_library")
+            file_path = os.path.join(library_dir, display_name + ".txt")
+
+            with open(file_path, 'w', encoding='utf-8') as f:
+                f.write(content)
+
+            # If this was the master, update master prompt variable
+            if listbox.get(index).startswith("⭐"):
+                self.master_prompt.set(content)
+                self.log_message("Master prompt updated and saved to library")
+            else:
+                self.log_message(f"Prompt '{display_name}' saved to library")
+
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to save prompt: {str(e)}")
+
+    def _pm_make_master(self, listbox, text_widget, indicator):
+        """Make the selected prompt the master prompt"""
+        try:
+            if not listbox.curselection():
+                messagebox.showinfo("Info", "Please select a prompt to make master.")
+                return
+
+            content = text_widget.get('1.0', tk.END).strip()
+
+            if not content:
+                messagebox.showwarning("Warning", "Prompt is empty.")
+                return
+
+            self.master_prompt.set(content)
+            self.log_message("Master prompt updated")
+
+            # Reload library to update star markers
+            self._pm_load_library(listbox, text_widget, indicator)
+
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to set master: {str(e)}")
+
+    def _pm_save_to_library(self, listbox, text_widget, indicator):
+        """Save current text as a new prompt in library"""
+        try:
+            content = text_widget.get('1.0', tk.END).strip()
+
+            if not content:
+                messagebox.showwarning("Warning", "Cannot save empty prompt.")
+                return
+
+            name = tk.simpledialog.askstring("Save Prompt", "Enter a name for this prompt:")
+
+            if not name:
+                return
+
+            # Clean up name and add extension
+            clean_name = name.replace('.txt', '')
+            file_name = clean_name + '.txt'
+
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            library_dir = os.path.join(script_dir, "prompt_library")
+            file_path = os.path.join(library_dir, file_name)
+
+            if os.path.exists(file_path):
+                if not messagebox.askyesno("Overwrite", f"Prompt '{clean_name}' already exists. Overwrite?"):
+                    return
+
+            with open(file_path, 'w', encoding='utf-8') as f:
+                f.write(content)
+
+            self.log_message(f"Prompt saved to library: {clean_name}")
+            self._pm_load_library(listbox, text_widget, indicator)
+
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to save: {str(e)}")
+
+    def _pm_import_prompt(self, listbox, text_widget, indicator):
+        """Import a prompt file to library"""
+        try:
+            filename = filedialog.askopenfilename(
+                title="Import Prompt to Library",
+                filetypes=[("Text files", "*.txt"), ("All files", "*.*")]
+            )
+
+            if not filename:
+                return
+
+            with open(filename, 'r', encoding='utf-8') as f:
+                content = f.read()
+
+            basename = os.path.splitext(os.path.basename(filename))[0]
+            name = tk.simpledialog.askstring(
+                "Prompt Name",
+                "Enter a name for this prompt:",
+                initialvalue=basename
+            )
+
+            if not name:
+                return
+
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            library_dir = os.path.join(script_dir, "prompt_library")
+
+            if not os.path.exists(library_dir):
+                os.makedirs(library_dir)
+
+            file_path = os.path.join(library_dir, name + ".txt")
+
+            with open(file_path, 'w', encoding='utf-8') as f:
+                f.write(content)
+
+            self.log_message(f"Prompt imported: {name}")
+            self._pm_load_library(listbox, text_widget, indicator)
+
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to import: {str(e)}")
+
+    def _pm_remove_prompt(self, listbox, text_widget, indicator):
+        """Remove selected prompt from library"""
+        try:
+            if not listbox.curselection():
+                messagebox.showinfo("Info", "Please select a prompt to remove.")
+                return
+
+            index = listbox.curselection()[0]
+            display_name = listbox.get(index)
+
+            if display_name.startswith("⭐"):
+                messagebox.showwarning("Warning", "Cannot remove the master prompt from library.\n\n"
+                                     "Make another prompt the master first.")
+                return
+
+            clean_name = display_name.replace("⭐ ", "")
+
+            if not messagebox.askyesno("Confirm", f"Remove prompt '{clean_name}' from library?"):
+                return
+
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            library_dir = os.path.join(script_dir, "prompt_library")
+            file_path = os.path.join(library_dir, clean_name + ".txt")
+
+            os.remove(file_path)
+            self.log_message(f"Prompt removed: {clean_name}")
+
+            text_widget.delete('1.0', tk.END)
+            indicator.config(text="")
+            self._pm_load_library(listbox, text_widget, indicator)
+
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to remove: {str(e)}")
+
+    def _pm_reset_to_default(self, text_widget, indicator):
+        """Reset master prompt to default"""
+        if messagebox.askyesno("Reset", "Reset master prompt to default?"):
+            self.set_default_prompt()
+            text_widget.delete('1.0', tk.END)
+            text_widget.insert('1.0', self.master_prompt.get())
+            indicator.config(text="")
+            self.log_message("Master prompt reset to default")
 
     def generate_content(self):
         """Generate content for selected section"""
@@ -7341,6 +7724,13 @@ Rewritten text with consistent {target_tense} tense:"""
 
     def _show_tense_fix_dialog(self, tense_analysis, scope="section"):
         """Display tense analysis results with options to fix"""
+        # Prevent duplicate modal
+        modal_key = f'tense_fix_{scope}'
+        if modal_key in self.open_modals and self.open_modals[modal_key].winfo_exists():
+            self.open_modals[modal_key].lift()
+            self.open_modals[modal_key].focus_force()
+            return
+
         dialog = tk.Toplevel(self.root)
         dialog.title("Check & Fix Tenses")
         dialog.geometry("800x600")
@@ -7349,6 +7739,10 @@ Rewritten text with consistent {target_tense} tense:"""
         # Make dialog modal
         dialog.transient(self.root)
         dialog.grab_set()
+
+        # Track this modal
+        self.open_modals[modal_key] = dialog
+        dialog.protocol("WM_DELETE_WINDOW", lambda: self._close_modal(dialog, modal_key))
 
         # Main container with padding
         main_frame = tk.Frame(dialog, bg="#2b2b2b")
@@ -7463,10 +7857,8 @@ Rewritten text with consistent {target_tense} tense:"""
         future_btn.pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
 
         # Close button
-        close_btn = ttk.Button(fix_frame, text="Close", command=dialog.destroy)
+        close_btn = ttk.Button(fix_frame, text="Close", command=lambda: self._close_modal(dialog, modal_key))
         close_btn.pack(pady=10)
-        close_btn = ttk.Button(fix_frame, text="Close", command=dialog.destroy)
-        close_btn.pack(pady=(10, 0))
 
         self.log_message(f"Tense analysis completed: {tense_analysis.consistency_score:.1f}/10")
 
@@ -8402,6 +8794,13 @@ Rewritten text with consistent {target_tense} tense:"""
 
     def _show_tense_fix_dialog(self, tense_analysis, scope="section"):
         """Display tense analysis results with options to fix"""
+        # Prevent duplicate modal
+        modal_key = f'tense_fix_{scope}'
+        if modal_key in self.open_modals and self.open_modals[modal_key].winfo_exists():
+            self.open_modals[modal_key].lift()
+            self.open_modals[modal_key].focus_force()
+            return
+
         dialog = tk.Toplevel(self.root)
         dialog.title("Check & Fix Tenses")
         dialog.geometry("800x600")
@@ -8410,6 +8809,10 @@ Rewritten text with consistent {target_tense} tense:"""
         # Make dialog modal
         dialog.transient(self.root)
         dialog.grab_set()
+
+        # Track this modal
+        self.open_modals[modal_key] = dialog
+        dialog.protocol("WM_DELETE_WINDOW", lambda: self._close_modal(dialog, modal_key))
 
         # Main container with padding
         main_frame = tk.Frame(dialog, bg="#2b2b2b")
@@ -8524,54 +8927,106 @@ Rewritten text with consistent {target_tense} tense:"""
         future_btn.pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
 
         # Close button
-        close_btn = ttk.Button(fix_frame, text="Close", command=dialog.destroy)
+        close_btn = ttk.Button(fix_frame, text="Close", command=lambda: self._close_modal(dialog, modal_key))
         close_btn.pack(pady=10)
-        close_btn = ttk.Button(fix_frame, text="Close", command=dialog.destroy)
-        close_btn.pack(pady=(10, 0))
 
         self.log_message(f"Tense analysis completed: {tense_analysis.consistency_score:.1f}/10")
 
-    def show_processing_strategy_dialog(self):
-        """NEW FEATURE: Display content processing strategy analysis"""
+    def show_processing_strategy_dialog(self, scope="section"):
+        """Display content processing strategy analysis with master prompt info"""
+        # Prevent duplicate modal
+        modal_key = f'processing_strategy_{scope}'
+        if modal_key in self.open_modals and self.open_modals[modal_key].winfo_exists():
+            self.open_modals[modal_key].lift()
+            self.open_modals[modal_key].focus_force()
+            return
+
         if not self.content_processor:
             messagebox.showinfo("Feature Unavailable",
                             "Intelligent processing requires content_processor module")
             return
-        
-        if not self.selected_section or not self.selected_section.has_content():
-            messagebox.showwarning("No Content", "Please select a section with content")
-            return
-        
-        content = self.selected_section.get_existing_content()
-        
+
+        # Collect content based on scope
+        if scope == "section":
+            if not self.selected_section or not self.selected_section.has_content():
+                messagebox.showwarning("No Content", "Please select a section with content")
+                return
+            content = self.selected_section.get_existing_content()
+            sections = [self.selected_section]
+            scope_text = f"Section: {self.selected_section.get_full_path()}"
+        else:  # document scope
+            if not self.document:
+                messagebox.showwarning("No Document", "Please load a document first")
+                return
+            # Collect all sections with content
+            sections = []
+            self._collect_sections_with_content(self.document, sections)
+            if not sections:
+                messagebox.showwarning("No Content", "Document has no content to analyze")
+                return
+            content = "\n\n".join([s.get_existing_content() for s in sections])
+            scope_text = "Scope: Entire Document"
+
         try:
+            # Get master prompt for calculation
+            master_prompt = self.master_prompt.get()
+            master_prompt_tokens = len(master_prompt.split()) * 1.3  # Rough token estimate
+
             strategy = self.content_processor.determine_processing_strategy(
-                content, [self.selected_section], "Generate comprehensive content"
+                content, sections, "Generate comprehensive content"
             )
-            
+
             dialog = tk.Toplevel(self.root)
             dialog.title("Processing Strategy Analysis")
-            dialog.geometry("600x500")
+            dialog.geometry("650x600")
             dialog.configure(bg="#2b2b2b")
             dialog.grab_set()
-            
+
+            # Track this modal
+            self.open_modals[modal_key] = dialog
+            dialog.protocol("WM_DELETE_WINDOW", lambda: self._close_modal(dialog, modal_key))
+
             main_frame = ttk.Frame(dialog, padding="20")
             main_frame.pack(fill=tk.BOTH, expand=True)
-            
-            ttk.Label(main_frame, text="Content Processing Strategy", 
-                    font=("Arial", 12, "bold")).pack(anchor=tk.W, pady=(0, 15))
-            
+
+            ttk.Label(main_frame, text="Content Processing Strategy",
+                    font=("Arial", 12, "bold")).pack(anchor=tk.W, pady=(0, 5))
+
+            ttk.Label(main_frame, text=scope_text,
+                    foreground="#888888", font=("Arial", 9)).pack(anchor=tk.W, pady=(0, 15))
+
+            # Strategy info
             info_frame = ttk.LabelFrame(main_frame, text="Recommended Strategy", padding="10")
             info_frame.pack(fill=tk.X, pady=(0, 10))
-            
+
             ttk.Label(info_frame, text=f"Method: {strategy.method.upper()}",
                     font=("Arial", 10, "bold")).pack(anchor=tk.W)
             ttk.Label(info_frame, text=f"Reason: {strategy.reason}").pack(anchor=tk.W, pady=5)
-            ttk.Label(info_frame, text=f"Token Estimate: {strategy.token_estimate}").pack(anchor=tk.W)
+            ttk.Label(info_frame, text=f"Content Token Estimate: ~{strategy.token_estimate}").pack(anchor=tk.W)
             ttk.Label(info_frame, text=f"Confidence: {strategy.confidence:.1%}").pack(anchor=tk.W)
-            
-            ttk.Button(main_frame, text="Close", command=dialog.destroy).pack(side=tk.RIGHT)
-            
+
+            # Master prompt info
+            prompt_frame = ttk.LabelFrame(main_frame, text="Master Prompt Analysis", padding="10")
+            prompt_frame.pack(fill=tk.X, pady=(0, 10))
+
+            ttk.Label(prompt_frame, text=f"Master Prompt Tokens: ~{int(master_prompt_tokens)}").pack(anchor=tk.W)
+            ttk.Label(prompt_frame, text=f"Total Estimated Tokens: ~{int(strategy.token_estimate + master_prompt_tokens)}").pack(anchor=tk.W, pady=5)
+
+            # Display snippet of master prompt
+            preview_label = ttk.Label(prompt_frame, text="Master Prompt Preview (first 200 chars):",
+                                     font=("Arial", 9, "bold"))
+            preview_label.pack(anchor=tk.W, pady=(10, 5))
+
+            preview_text = tk.Text(prompt_frame, height=4, width=60,
+                                  bg="#1e1e1e", fg="#888888",
+                                  font=("Consolas", 9), wrap=tk.WORD)
+            preview_text.pack(fill=tk.X)
+            preview_text.insert('1.0', master_prompt[:200] + ("..." if len(master_prompt) > 200 else ""))
+            preview_text.config(state=tk.DISABLED)
+
+            ttk.Button(main_frame, text="Close",
+                      command=lambda: self._close_modal(dialog, modal_key)).pack(side=tk.RIGHT)
+
         except Exception as e:
             messagebox.showerror("Error", f"Failed to analyze strategy: {str(e)}")
 
