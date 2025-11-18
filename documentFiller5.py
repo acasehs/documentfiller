@@ -32,6 +32,14 @@ import uuid
 # Add after existing imports, before class definitions
 
 # ============================================================================
+# CONFIGURATION OPTIONS
+# ============================================================================
+# Set to True to auto-load default credential file without prompting
+# Set to False to prompt user to select credential file on startup (recommended)
+AUTO_LOAD_CREDENTIALS = False
+DEFAULT_CREDENTIAL_FILE = "config_credentials.enc"
+
+# ============================================================================
 # ENHANCED MODULE IMPORTS - Optional for graceful degradation
 # ============================================================================
 ENHANCED_FEATURES_AVAILABLE = {
@@ -279,8 +287,51 @@ class DocxDocumentFiller:
 
         if ENHANCED_FEATURES_AVAILABLE['encryption'] and CredentialManager:
             try:
-                self.credential_manager = CredentialManager()
-                print("✓ Credential manager initialized")
+                # Prompt for credential file selection if auto-load is disabled
+                credential_file = DEFAULT_CREDENTIAL_FILE
+
+                if not AUTO_LOAD_CREDENTIALS:
+                    # Prompt user to select credential file
+                    script_dir = os.path.dirname(os.path.abspath(__file__))
+                    default_path = os.path.join(script_dir, DEFAULT_CREDENTIAL_FILE)
+
+                    result = messagebox.askyesnocancel(
+                        "Select Credentials",
+                        f"Load credentials from default file?\n\n{DEFAULT_CREDENTIAL_FILE}\n\n" +
+                        "Yes: Load default file\n" +
+                        "No: Select different file\n" +
+                        "Cancel: Skip credential loading"
+                    )
+
+                    if result is None:  # Cancel
+                        print("⊘ User skipped credential loading")
+                        credential_file = None
+                    elif result is False:  # No - browse for file
+                        selected_file = filedialog.askopenfilename(
+                            title="Select Credentials File",
+                            initialdir=script_dir,
+                            filetypes=[
+                                ("Encrypted credentials", "*.enc"),
+                                ("JSON files", "*.json"),
+                                ("All files", "*.*")
+                            ]
+                        )
+                        if selected_file:
+                            credential_file = selected_file
+                            print(f"✓ User selected: {os.path.basename(credential_file)}")
+                        else:
+                            print("⊘ No file selected - skipping credential loading")
+                            credential_file = None
+                    else:  # Yes - use default
+                        print(f"✓ Using default credential file: {DEFAULT_CREDENTIAL_FILE}")
+
+                # Initialize credential manager with selected file
+                if credential_file:
+                    self.credential_manager = CredentialManager(credential_file)
+                    print("✓ Credential manager initialized")
+                else:
+                    print("⊘ Credential manager not initialized - no file selected")
+
             except Exception as e:
                 print(f"⚠ Credential manager init failed: {e}")
 
@@ -1303,82 +1354,97 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
     def setup_text_widgets_colors(self):
         """Enhanced text widget styling with additional markdown support"""
         try:
+            # List of all text widgets that need white cursor on dark background
+            dark_text_widgets = [
+                self.generated_text,
+                self.existing_text,
+                self.prompt_text,
+                self.console
+            ]
+
+            # Apply white cursor to all dark text widgets
+            for widget in dark_text_widgets:
+                if widget:
+                    widget.config(insertbackground='#ffffff')  # White cursor
+                    widget.config(selectbackground='#3a5f8f')  # Blue selection
+                    widget.config(selectforeground='#ffffff')  # White selection text
+
             # Configure existing tags
             self.generated_text.tag_configure('bold', font=('TkDefaultFont', 10, 'bold'))
             self.generated_text.tag_configure('italic', font=('TkDefaultFont', 10, 'italic'))
-            self.generated_text.tag_configure('code', 
+            self.generated_text.tag_configure('code',
                                             font=('Consolas', 9),
                                             background='#f0f0f0',
                                             foreground='#008000')
-            
+
             # Add new enhanced tags
-            self.generated_text.tag_configure('highlight', 
+            self.generated_text.tag_configure('highlight',
                                             background='#ffff00',
                                             foreground='#000000')
-            
-            self.generated_text.tag_configure('strike', 
+
+            self.generated_text.tag_configure('strike',
                                             overstrike=True,
                                             foreground='#808080')
-            
-            self.generated_text.tag_configure('quote', 
+
+            self.generated_text.tag_configure('quote',
                                             font=('TkDefaultFont', 10, 'italic'),
                                             foreground='#606060',
                                             lmargin1=20,
                                             lmargin2=20)
-            
-            self.generated_text.tag_configure('hr', 
+
+            self.generated_text.tag_configure('hr',
                                             foreground='#808080',
                                             justify='center')
-            
-            self.generated_text.tag_configure('code_lang', 
+
+            self.generated_text.tag_configure('code_lang',
                                             font=('TkDefaultFont', 8),
                                             foreground='#808080')
-            
+
             # Table styling
-            self.generated_text.tag_configure('table_header', 
+            self.generated_text.tag_configure('table_header',
                                             font=('TkDefaultFont', 10, 'bold'),
                                             foreground='#000080')
-            
-            self.generated_text.tag_configure('table_sep', 
+
+            self.generated_text.tag_configure('table_sep',
                                             foreground='#808080')
-            
-            self.generated_text.tag_configure('table_row', 
+
+            self.generated_text.tag_configure('table_row',
                                             font=('Consolas', 9),
                                             foreground='#404040')
-            
+
             # Apply dark theme colors if using dark theme
             if hasattr(self, 'is_dark_theme') and self.is_dark_theme:
                 self.generated_text.configure(bg='#1e1e1e', fg='#ffffff', insertbackground='#ffffff')
-                
+
                 # Adjust colors for dark theme
-                self.generated_text.tag_configure('code', 
+                self.generated_text.tag_configure('code',
                                                 background='#2d2d2d',
                                                 foreground='#90ee90')
-                
-                self.generated_text.tag_configure('quote', 
+
+                self.generated_text.tag_configure('quote',
                                                 foreground='#c0c0c0')
-                
-                self.generated_text.tag_configure('table_header', 
+
+                self.generated_text.tag_configure('table_header',
                                                 foreground='#87ceeb')
-                
-                self.generated_text.tag_configure('table_row', 
+
+                self.generated_text.tag_configure('table_row',
                                                 foreground='#d0d0d0')
-                
-                self.generated_text.tag_configure('hr', 
+
+                self.generated_text.tag_configure('hr',
                                                 foreground='#c0c0c0')
-                
-                self.generated_text.tag_configure('code_lang', 
+
+                self.generated_text.tag_configure('code_lang',
                                                 foreground='#c0c0c0')
-            
+
             # Configure prompt text widget
             if hasattr(self, 'prompt_text'):
                 self.prompt_text.tag_configure('bold', font=('TkDefaultFont', 10, 'bold'))
                 self.prompt_text.tag_configure('italic', font=('TkDefaultFont', 10, 'italic'))
-                self.prompt_text.tag_configure('code', 
+                self.prompt_text.tag_configure('code',
                                             font=('Consolas', 9),
                                             background='#f0f0f0' if not hasattr(self, 'is_dark_theme') or not self.is_dark_theme else '#2d2d2d',
                                             foreground='#008000' if not hasattr(self, 'is_dark_theme') or not self.is_dark_theme else '#90ee90')
-                
+
         except Exception as e:
             print(f"Error setting up enhanced text widget colors: {e}")
 
@@ -1629,6 +1695,49 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
         except Exception as e:
             messagebox.showerror("Analysis Error", f"Failed to analyze tenses: {str(e)}")
             self.log_message(f"Tense analysis error: {e}")
+
+    def _correct_section_tenses(self, target_tense):
+        """Correct section tenses using AI"""
+        try:
+            self.log_message(f"Correcting tenses to {target_tense}...")
+
+            content = self.selected_section.get_existing_content()
+
+            prompt = f"""Rewrite the following text to use consistent {target_tense} tense throughout.
+
+Maintain:
+- All factual information and technical details
+- Document structure and formatting
+- Overall meaning and intent
+- Markdown formatting (bold, italics, etc.)
+
+Only change:
+- Verb tenses to {target_tense} tense
+- Related time expressions as needed
+
+Original text:
+{content}
+
+Rewritten text with consistent {target_tense} tense:"""
+
+            self.log_message("Sending tense correction request to AI...")
+            corrected_content = self.query_openwebui(prompt)
+
+            if corrected_content and not corrected_content.startswith("Error:"):
+                self.generated_content = corrected_content
+                self.show_generated_content()
+                self.notebook.select(0)
+                self.log_message("✓ Tense correction completed - review in preview")
+                messagebox.showinfo("Success",
+                    f"Content corrected to {target_tense} tense.\n\n"
+                    "Review the changes in the preview and commit if acceptable.")
+            else:
+                self.log_message(f"Tense correction failed: {corrected_content}")
+                messagebox.showerror("Error", f"Failed to correct tenses: {corrected_content}")
+
+        except Exception as e:
+            self.log_message(f"Error correcting tenses: {e}")
+            messagebox.showerror("Error", f"Failed to correct tenses: {str(e)}")
 
     def show_processing_strategy_dialog(self):
         """NEW FEATURE: Display content processing strategy analysis"""
@@ -3025,51 +3134,51 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
         library_window.geometry("900x600")
         library_window.configure(bg="#2b2b2b")
         library_window.grab_set()
-        
+
         main_frame = ttk.Frame(library_window, padding="20")
         main_frame.pack(fill=tk.BOTH, expand=True)
-        
-        ttk.Label(main_frame, text="Prompt Library Manager", 
+
+        ttk.Label(main_frame, text="Prompt Library Manager",
                 font=("Arial", 14, "bold")).pack(anchor=tk.W, pady=(0, 15))
-        
+
         # Create split view
         pane = ttk.PanedWindow(main_frame, orient=tk.HORIZONTAL)
         pane.pack(fill=tk.BOTH, expand=True, pady=(0, 15))
-        
+
         # Left panel - list of saved prompts
-        left_frame = ttk.Frame(pane)
-        pane.add(left_frame, weight=1)
-        
+        left_frame = ttk.Frame(pane, width=300)  # Set explicit width
+        pane.add(left_frame, weight=0)  # Don't resize with window
+
         ttk.Label(left_frame, text="Saved Prompts:").pack(anchor=tk.W, pady=(0, 5))
-        
+
         # Prompt list with scrollbar
         list_frame = ttk.Frame(left_frame)
         list_frame.pack(fill=tk.BOTH, expand=True)
-        
+
         list_scrollbar = ttk.Scrollbar(list_frame)
         list_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        
+
         prompt_list = tk.Listbox(list_frame, yscrollcommand=list_scrollbar.set,
                                 bg="#1e1e1e", fg="#ffffff", font=("Consolas", 10),
-                                width=30)  # Added width parameter to prevent collapsing
+                                width=35)  # Increased width to prevent collapse
         prompt_list.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         list_scrollbar.config(command=prompt_list.yview)
-        
+
         # Buttons for list operations
         list_btn_frame = ttk.Frame(left_frame)
         list_btn_frame.pack(fill=tk.X, pady=(5, 0))
-        
-        ttk.Button(list_btn_frame, text="Import", 
+
+        ttk.Button(list_btn_frame, text="Import",
                 command=lambda: self.import_prompt_to_library(prompt_list, prompt_preview)).pack(side=tk.LEFT, padx=(0, 5))
-        ttk.Button(list_btn_frame, text="Remove", 
+        ttk.Button(list_btn_frame, text="Remove",
                 command=lambda: self.remove_prompt_from_library(prompt_list, prompt_preview)).pack(side=tk.LEFT)
-        
+
         # Right panel - prompt preview
         right_frame = ttk.Frame(pane)
-        pane.add(right_frame, weight=2)
-        
+        pane.add(right_frame, weight=3)  # Takes up remaining space
+
         ttk.Label(right_frame, text="Prompt Preview:").pack(anchor=tk.W, pady=(0, 5))
-        
+
         prompt_preview = scrolledtext.ScrolledText(right_frame, height=20,
                                                 bg="#1e1e1e", fg="#ffffff",
                                                 font=("Consolas", 10), wrap=tk.WORD)
@@ -3078,31 +3187,32 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
         prompt_preview.config(insertbackground="#ffffff")  # White cursor
         prompt_preview.config(selectbackground="#3a5f8f")  # Blue selection background
         prompt_preview.config(selectforeground="#ffffff")  # White selection text
-        
+
         # Buttons for preview operations
         preview_btn_frame = ttk.Frame(right_frame)
         preview_btn_frame.pack(fill=tk.X)
-        
-        ttk.Button(preview_btn_frame, text="Use This Prompt", 
+
+        ttk.Button(preview_btn_frame, text="Use This Prompt",
                 command=lambda: self.use_selected_prompt(prompt_list, prompt_preview, library_window)).pack(side=tk.RIGHT)
-        
+
         # Bottom buttons
         bottom_frame = ttk.Frame(main_frame)
         bottom_frame.pack(fill=tk.X, pady=(0, 5))
-        
-        ttk.Button(bottom_frame, text="Close", 
+
+        ttk.Button(bottom_frame, text="Close",
                 command=library_window.destroy).pack(side=tk.RIGHT)
-        
+
         # Load saved prompts from library
         self.load_prompt_library(prompt_list, prompt_preview)
-        
+
         # Bind selection event
-        prompt_list.bind('<<ListboxSelect>>', 
+        prompt_list.bind('<<ListboxSelect>>',
                         lambda e: self.on_prompt_select(e, prompt_list, prompt_preview))
-        
-        # Ensure the window is properly sized
+
+        # Ensure the window is properly sized and sash is positioned correctly
         library_window.update_idletasks()
-        pane.sashpos(0, 300)
+        # Set sash position after window is fully rendered
+        library_window.after(100, lambda: pane.sashpos(0, 300))
 
     def edit_master_prompt(self):
         """Open master prompt editor"""
@@ -3311,6 +3421,32 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
             self.log_message("🔄 Re-enabling generate button...")
             self.root.after(0, lambda: self.generate_btn.config(state='normal'))
             
+    def query_openwebui_with_logging(self, prompt, operation_name="API Request"):
+        """Query OpenWebUI with detailed logging - wrapper for all operations"""
+        import time
+
+        self.log_message("="*60)
+        self.log_message(f"Starting: {operation_name}")
+        self.log_message(f"📊 Prompt size: {len(prompt)} characters")
+        self.log_message(f"🚀 Sending request to OpenWebUI API...")
+        self.log_message(f"   Model: {self.selected_model.get()}")
+        self.log_message(f"   Temperature: {self.temperature.get()}")
+        self.log_message(f"   Max tokens: {self.max_tokens.get()}")
+        self.log_message(f"   Timeout: 300 seconds (5 minutes)")
+
+        start_time = time.time()
+        response = self.query_openwebui(prompt)
+        elapsed_time = time.time() - start_time
+
+        if response and not response.startswith("Error:"):
+            self.log_message(f"⏱️  Response received in {elapsed_time:.1f} seconds")
+            self.log_message(f"✅ {operation_name} completed ({len(response)} characters)")
+        else:
+            self.log_message(f"❌ {operation_name} failed: {response}")
+
+        self.log_message("="*60)
+        return response
+
     def query_openwebui(self, prompt):
         """Query OpenWebUI API (non-streaming with detailed error handling)"""
         try:
@@ -6535,6 +6671,49 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
             messagebox.showerror("Analysis Error", f"Failed to analyze tenses: {str(e)}")
             self.log_message(f"Tense analysis error: {e}")
 
+    def _correct_section_tenses(self, target_tense):
+        """Correct section tenses using AI"""
+        try:
+            self.log_message(f"Correcting tenses to {target_tense}...")
+
+            content = self.selected_section.get_existing_content()
+
+            prompt = f"""Rewrite the following text to use consistent {target_tense} tense throughout.
+
+Maintain:
+- All factual information and technical details
+- Document structure and formatting
+- Overall meaning and intent
+- Markdown formatting (bold, italics, etc.)
+
+Only change:
+- Verb tenses to {target_tense} tense
+- Related time expressions as needed
+
+Original text:
+{content}
+
+Rewritten text with consistent {target_tense} tense:"""
+
+            self.log_message("Sending tense correction request to AI...")
+            corrected_content = self.query_openwebui(prompt)
+
+            if corrected_content and not corrected_content.startswith("Error:"):
+                self.generated_content = corrected_content
+                self.show_generated_content()
+                self.notebook.select(0)
+                self.log_message("✓ Tense correction completed - review in preview")
+                messagebox.showinfo("Success",
+                    f"Content corrected to {target_tense} tense.\n\n"
+                    "Review the changes in the preview and commit if acceptable.")
+            else:
+                self.log_message(f"Tense correction failed: {corrected_content}")
+                messagebox.showerror("Error", f"Failed to correct tenses: {corrected_content}")
+
+        except Exception as e:
+            self.log_message(f"Error correcting tenses: {e}")
+            messagebox.showerror("Error", f"Failed to correct tenses: {str(e)}")
+
     def show_processing_strategy_dialog(self):
         """NEW FEATURE: Display content processing strategy analysis"""
         if not self.content_processor:
@@ -7222,6 +7401,49 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
         except Exception as e:
             messagebox.showerror("Analysis Error", f"Failed to analyze tenses: {str(e)}")
 
+    def _correct_section_tenses(self, target_tense):
+        """Correct section tenses using AI"""
+        try:
+            self.log_message(f"Correcting tenses to {target_tense}...")
+
+            content = self.selected_section.get_existing_content()
+
+            prompt = f"""Rewrite the following text to use consistent {target_tense} tense throughout.
+
+Maintain:
+- All factual information and technical details
+- Document structure and formatting
+- Overall meaning and intent
+- Markdown formatting (bold, italics, etc.)
+
+Only change:
+- Verb tenses to {target_tense} tense
+- Related time expressions as needed
+
+Original text:
+{content}
+
+Rewritten text with consistent {target_tense} tense:"""
+
+            self.log_message("Sending tense correction request to AI...")
+            corrected_content = self.query_openwebui(prompt)
+
+            if corrected_content and not corrected_content.startswith("Error:"):
+                self.generated_content = corrected_content
+                self.show_generated_content()
+                self.notebook.select(0)
+                self.log_message("✓ Tense correction completed - review in preview")
+                messagebox.showinfo("Success",
+                    f"Content corrected to {target_tense} tense.\n\n"
+                    "Review the changes in the preview and commit if acceptable.")
+            else:
+                self.log_message(f"Tense correction failed: {corrected_content}")
+                messagebox.showerror("Error", f"Failed to correct tenses: {corrected_content}")
+
+        except Exception as e:
+            self.log_message(f"Error correcting tenses: {e}")
+            messagebox.showerror("Error", f"Failed to correct tenses: {str(e)}")
+
     def show_processing_strategy_dialog(self):
         """NEW FEATURE: Display content processing strategy analysis"""
         if not self.content_processor:
@@ -7714,16 +7936,21 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
         thread.start()
 
     def process_chat_message(self, user_message):
-        """Process chat message in background thread with streaming"""
+        """Process chat message in background thread (non-streaming with detailed logging)"""
         try:
             section_hash = self.current_chat_section.get_section_hash()
+            section = self.current_chat_section
 
             # Add user message to history
             self.section_chat_history[section_hash].append(("user", user_message))
             self.root.after(0, self.refresh_chat_display)
 
             # Build context for AI
-            section = self.current_chat_section
+            self.log_message("="*60)
+            self.log_message("Section Chat")
+            self.log_message(f"📄 Section: {section.get_full_path()}")
+            self.log_message(f"💬 Message: {user_message[:80]}..." if len(user_message) > 80 else f"💬 Message: {user_message}")
+
             context = f"""You are helping refine content for a document section.
 
 Section: {section.get_full_path()}
@@ -7733,54 +7960,52 @@ Current content:
 
 Previous conversation:
 """
-            # Include last 4 messages for context
             history = self.section_chat_history[section_hash]
-            for role, msg in history[-5:-1]:  # Exclude the current user message
+            for role, msg in history[-5:-1]:
                 context += f"\n{role.upper()}: {msg}\n"
 
             context += f"\nUser's current question/request: {user_message}\n\n"
             context += "Respond helpfully. If the user asks you to write or modify content, provide the complete updated content in your response."
 
-            # Add placeholder for streaming response
-            self.section_chat_history[section_hash].append(("assistant", ""))
-            current_response_idx = len(self.section_chat_history[section_hash]) - 1
+            self.log_message(f"📊 Context size: {len(context)} characters")
+            self.log_message(f"🚀 Sending to OpenWebUI API...")
+            self.log_message(f"   Model: {self.selected_model.get()}")
+            self.log_message(f"   Temperature: {self.temperature.get()}")
+            self.root.after(0, lambda: self.update_status("🌐 Sending chat message..."))
 
-            # Update status
-            self.root.after(0, lambda: self.update_status("Sending message to AI..."))
-            self.log_message("Sending chat message to AI...")
+            import time
+            start_time = time.time()
+            self.root.after(0, lambda: self.update_status("⏳ Waiting for response..."))
+            response = self.query_openwebui(context)
+            elapsed_time = time.time() - start_time
 
-            # Define streaming callback
-            def on_chunk(chunk):
-                """Handle each streaming chunk"""
-                # Update the response in history
-                role, current_text = self.section_chat_history[section_hash][current_response_idx]
-                self.section_chat_history[section_hash][current_response_idx] = (role, current_text + chunk)
-                # Refresh display
-                self.root.after(0, self.refresh_chat_display)
-                # Update status
-                self.root.after(0, lambda: self.update_status("Receiving response..."))
-
-            # Query AI with streaming
-            response = self.query_openwebui_streaming(context, callback=on_chunk)
+            self.log_message(f"⏱️  Response received in {elapsed_time:.1f} seconds")
 
             if response and not response.startswith("Error:"):
-                # Ensure final response is in history
-                self.section_chat_history[section_hash][current_response_idx] = ("assistant", response)
+                self.section_chat_history[section_hash].append(("assistant", response))
+                self.log_message(f"✅ Chat completed ({len(response)} characters)")
                 self.root.after(0, self.refresh_chat_display)
                 self.root.after(0, lambda: self.chat_apply_btn.config(state=tk.NORMAL))
-                self.root.after(0, lambda: self.update_status("Response received"))
-                self.log_message("AI response received")
+                self.root.after(0, lambda: self.update_status("✅ Response received"))
+                self.log_message("="*60)
             else:
-                # Remove placeholder on error
-                self.section_chat_history[section_hash].pop(current_response_idx)
-                self.log_message(f"Chat error: {response}")
-                self.root.after(0, lambda: self.update_status("Error receiving response"))
+                self.log_message(f"❌ Chat failed: {response}")
+                self.root.after(0, lambda: self.update_status(f"❌ Failed: {response}"))
                 self.root.after(0, lambda: messagebox.showerror("Error", f"Failed to get response: {response}"))
+                self.log_message("="*60)
 
+        except requests.exceptions.Timeout:
+            self.log_message(f"⏰ TIMEOUT: Request timed out after 300 seconds")
+            self.root.after(0, lambda: self.update_status("⏰ Request timed out"))
+            self.root.after(0, lambda: messagebox.showerror("Timeout", "Request timed out after 5 minutes"))
+            self.log_message("="*60)
         except Exception as e:
-            self.log_message(f"Chat error: {str(e)}")
-            self.root.after(0, lambda: self.update_status(f"Error: {str(e)}"))
+            self.log_message(f"❌ ERROR: {str(e)}")
+            self.root.after(0, lambda: self.update_status(f"❌ Error: {str(e)}"))
             self.root.after(0, lambda: messagebox.showerror("Error", f"Chat failed: {str(e)}"))
+            self.log_message("="*60)
+            import traceback
+            self.log_message(traceback.format_exc())
         finally:
             self.root.after(0, lambda: self.chat_send_btn.config(state=tk.NORMAL))
 
