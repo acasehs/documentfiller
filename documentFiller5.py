@@ -2432,97 +2432,111 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
             status_label.config(text="✓ Resources loaded")
 
     def open_config_dialog(self):
-        """Open OpenWebUI AI configuration dialog"""
+        """Open OpenWebUI AI configuration dialog - COMPACT LAYOUT"""
         config_window = tk.Toplevel(self.root)
         config_window.title("OpenWebUI AI Configuration")
-        config_window.geometry("700x1000")
+        config_window.geometry("700x700")
         config_window.configure(bg="#2b2b2b")
         config_window.grab_set()
-        
-        main_frame = ttk.Frame(config_window, padding="20")
+
+        main_frame = ttk.Frame(config_window, padding="15")
         main_frame.pack(fill=tk.BOTH, expand=True)
-        
+
         # Configuration Files section
-        config_file_frame = ttk.LabelFrame(main_frame, text="Configuration Files", padding="10")
-        config_file_frame.pack(fill=tk.X, pady=(0, 10))
-        
+        config_file_frame = ttk.LabelFrame(main_frame, text="Configuration Files", padding="8")
+        config_file_frame.pack(fill=tk.X, pady=(0, 8))
+
         config_btn_frame = ttk.Frame(config_file_frame)
         config_btn_frame.pack(fill=tk.X)
-        
-        ttk.Button(config_btn_frame, text="Load Config", 
+
+        ttk.Button(config_btn_frame, text="Load Config",
                 command=self.browse_config_file).pack(side=tk.LEFT, padx=(0, 10))
-        ttk.Button(config_btn_frame, text="Save Config As", 
+        ttk.Button(config_btn_frame, text="Save Config As",
                 command=self.save_config_as).pack(side=tk.LEFT)
-        
-        # Connection settings
-        conn_frame = ttk.LabelFrame(main_frame, text="Connection", padding="10")
-        conn_frame.pack(fill=tk.X, pady=(0, 10))
-        
-        ttk.Label(conn_frame, text="Base URL:").pack(anchor=tk.W)
+
+        # Connection settings - SIDE BY SIDE
+        conn_frame = ttk.LabelFrame(main_frame, text="Connection", padding="8")
+        conn_frame.pack(fill=tk.X, pady=(0, 8))
+        conn_frame.columnconfigure(0, weight=1)
+        conn_frame.columnconfigure(1, weight=1)
+
+        # Row 1: Base URL and API Key side-by-side
+        ttk.Label(conn_frame, text="Base URL:").grid(row=0, column=0, sticky=tk.W, padx=(0, 5))
+        ttk.Label(conn_frame, text="API Key:").grid(row=0, column=1, sticky=tk.W, padx=(5, 0))
+
         url_var = tk.StringVar(value=self.openwebui_base_url)
-        ttk.Entry(conn_frame, textvariable=url_var, width=50).pack(fill=tk.X, pady=(0, 10))
-        
-        ttk.Label(conn_frame, text="API Key:").pack(anchor=tk.W)
+        ttk.Entry(conn_frame, textvariable=url_var, width=30).grid(row=1, column=0, sticky=(tk.W, tk.E), padx=(0, 5), pady=(0, 8))
+
         key_var = tk.StringVar(value=self.openwebui_api_key)
-        ttk.Entry(conn_frame, textvariable=key_var, width=50, show="*").pack(fill=tk.X, pady=(0, 10))
-        
+        ttk.Entry(conn_frame, textvariable=key_var, width=30, show="*").grid(row=1, column=1, sticky=(tk.W, tk.E), padx=(5, 0), pady=(0, 8))
+
+        # Row 2: Test buttons
         test_frame = ttk.Frame(conn_frame)
-        test_frame.pack(fill=tk.X)
-        
+        test_frame.grid(row=2, column=0, columnspan=2, sticky=(tk.W, tk.E))
+
         status_label = ttk.Label(test_frame, text="")
-        
-        # Add Refresh All button
-        ttk.Button(test_frame, text="Refresh All", 
+
+        ttk.Button(test_frame, text="Refresh All",
                 command=lambda: self.refresh_all_ai_resources(url_var.get(), key_var.get(), model_combo, knowledge_list, status_label)).pack(side=tk.LEFT, padx=(0, 10))
-        
-        ttk.Button(test_frame, text="Test Connection", 
+
+        ttk.Button(test_frame, text="Test Connection",
                 command=lambda: self.test_connection(url_var.get(), key_var.get(), status_label)).pack(side=tk.LEFT)
-        
+
         status_label.pack(side=tk.LEFT, padx=(10, 0))
-        
-        # Model selection
-        model_frame = ttk.LabelFrame(main_frame, text="Model", padding="10")
-        model_frame.pack(fill=tk.X, pady=(0, 10))
-        
-        ttk.Button(model_frame, text="Refresh Models", 
-                command=lambda: self.refresh_models(url_var.get(), key_var.get(), model_combo)).pack(anchor=tk.W, pady=(0, 5))
-        
-        ttk.Label(model_frame, text="Select Default Model:").pack(anchor=tk.W)
+
+        # Model selection - BUTTON AND DROPDOWN IN SAME ROW
+        model_frame = ttk.LabelFrame(main_frame, text="Model", padding="8")
+        model_frame.pack(fill=tk.X, pady=(0, 8))
+        model_frame.columnconfigure(1, weight=1)
+
+        ttk.Button(model_frame, text="Refresh Models",
+                command=lambda: self.refresh_models(url_var.get(), key_var.get(), model_combo)).grid(row=0, column=0, padx=(0, 10))
+
         model_combo = ttk.Combobox(model_frame, textvariable=self.selected_model, state="readonly")
         model_combo['values'] = self.available_models
-        model_combo.pack(fill=tk.X)
-        
-        # Knowledge collections
-        knowledge_frame = ttk.LabelFrame(main_frame, text="RAG Knowledge Collections", padding="10")
-        knowledge_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
-        
-        ttk.Button(knowledge_frame, text="Refresh Collections", 
+        model_combo.grid(row=0, column=1, sticky=(tk.W, tk.E))
+
+        # Model parameters - TEMPERATURE AND MAX TOKENS IN ONE ROW
+        params_frame = ttk.LabelFrame(main_frame, text="Parameters", padding="8")
+        params_frame.pack(fill=tk.X, pady=(0, 8))
+        params_frame.columnconfigure(0, weight=1)
+        params_frame.columnconfigure(1, weight=1)
+
+        # Temperature (left side)
+        temp_label_var = tk.StringVar(value=f"Temperature: {self.temperature.get():.2f}")
+        temp_container = ttk.Frame(params_frame)
+        temp_container.grid(row=0, column=0, sticky=(tk.W, tk.E), padx=(0, 10))
+
+        ttk.Label(temp_container, textvariable=temp_label_var).pack(anchor=tk.W)
+        temp_scale = ttk.Scale(temp_container, from_=0.0, to=1.0, variable=self.temperature,
+                            command=lambda v: temp_label_var.set(f"Temperature: {float(v):.2f}"))
+        temp_scale.pack(fill=tk.X)
+
+        # Max Tokens (right side)
+        tokens_container = ttk.Frame(params_frame)
+        tokens_container.grid(row=0, column=1, sticky=(tk.W, tk.E))
+
+        ttk.Label(tokens_container, text="Max Tokens:").pack(anchor=tk.W)
+        ttk.Spinbox(tokens_container, from_=500, to=16000, textvariable=self.max_tokens,
+                increment=500).pack(fill=tk.X)
+
+        # Knowledge collections - BELOW PARAMETERS
+        knowledge_frame = ttk.LabelFrame(main_frame, text="RAG Knowledge Collections", padding="8")
+        knowledge_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 8))
+
+        ttk.Button(knowledge_frame, text="Refresh Collections",
                 command=lambda: self.refresh_knowledge(url_var.get(), key_var.get(), knowledge_list)).pack(anchor=tk.W, pady=(0, 5))
-        
+
         ttk.Label(knowledge_frame, text="Select Collections (Ctrl for multiple):").pack(anchor=tk.W)
-        
+
         knowledge_scroll = ttk.Scrollbar(knowledge_frame)
         knowledge_scroll.pack(side=tk.RIGHT, fill=tk.Y)
-        
-        knowledge_list = tk.Listbox(knowledge_frame, selectmode=tk.MULTIPLE, 
+
+        knowledge_list = tk.Listbox(knowledge_frame, selectmode=tk.MULTIPLE,
                                     yscrollcommand=knowledge_scroll.set,
                                     bg="#1e1e1e", fg="#ffffff", height=6)
         knowledge_list.pack(fill=tk.BOTH, expand=True)
         knowledge_scroll.config(command=knowledge_list.yview)
-        
-        # Model parameters
-        params_frame = ttk.LabelFrame(main_frame, text="Parameters", padding="10")
-        params_frame.pack(fill=tk.X, pady=(0, 10))
-        
-        temp_label_var = tk.StringVar(value=f"Temperature: {self.temperature.get()}")
-        ttk.Label(params_frame, textvariable=temp_label_var).pack(anchor=tk.W)
-        temp_scale = ttk.Scale(params_frame, from_=0.0, to=1.0, variable=self.temperature,
-                            command=lambda v: temp_label_var.set(f"Temperature: {float(v):.2f}"))
-        temp_scale.pack(fill=tk.X, pady=(0, 10))
-        
-        ttk.Label(params_frame, text="Max Tokens:").pack(anchor=tk.W)
-        ttk.Spinbox(params_frame, from_=500, to=16000, textvariable=self.max_tokens, 
-                increment=500).pack(fill=tk.X)
         
         # Buttons
         btn_frame = ttk.Frame(main_frame)
@@ -7071,57 +7085,106 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
         self.log_message(f"External RAG content manager opened ({count} items)")
 
     def create_section_chat_tab(self):
-        """Create the Section Chat tab for iterative refinement"""
+        """Create the Section Chat tab with side-by-side resizable layout"""
         chat_frame = ttk.Frame(self.notebook, padding="10")
         self.notebook.add(chat_frame, text="Section Chat")
 
         chat_frame.columnconfigure(0, weight=1)
         chat_frame.rowconfigure(1, weight=1)
 
-        # Info label
+        # Info label and controls
         info_frame = ttk.Frame(chat_frame)
-        info_frame.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=(0, 10))
+        info_frame.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=(0, 5))
 
         self.chat_section_label = tk.StringVar(value="No section selected for chat")
         ttk.Label(info_frame, textvariable=self.chat_section_label, font=("Arial", 10, "bold")).pack(side=tk.LEFT)
 
-        ttk.Button(info_frame, text="Start Chat with Selected Section",
-                command=self.start_section_chat).pack(side=tk.RIGHT)
-        ttk.Button(info_frame, text="Clear Chat",
-                command=self.clear_section_chat).pack(side=tk.RIGHT, padx=(0, 5))
+        ttk.Button(info_frame, text="Start Chat", command=self.start_section_chat).pack(side=tk.RIGHT)
+        ttk.Button(info_frame, text="Clear Chat", command=self.clear_section_chat).pack(side=tk.RIGHT, padx=(0, 5))
+        ttk.Button(info_frame, text="Update Content from Editor", command=self.update_section_from_editor).pack(side=tk.RIGHT, padx=(0, 5))
+
+        # Resizable PanedWindow for side-by-side layout
+        paned = tk.PanedWindow(chat_frame, orient=tk.HORIZONTAL, sashwidth=5, sashrelief=tk.RAISED, bg="#404040")
+        paned.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+
+        # LEFT PANE: Section Content Editor
+        left_frame = ttk.LabelFrame(paned, text="Section Content (Editable)", padding="5")
+
+        self.chat_content_editor = scrolledtext.ScrolledText(left_frame, width=40, height=25,
+                                                             bg='#1e1e1e', fg='#ffffff',
+                                                             insertbackground='#ffffff', wrap=tk.WORD)
+        self.chat_content_editor.pack(fill=tk.BOTH, expand=True)
+
+        paned.add(left_frame, minsize=200)
+
+        # RIGHT PANE: Chat Interface
+        right_frame = ttk.Frame(paned)
+
+        right_frame.columnconfigure(0, weight=1)
+        right_frame.rowconfigure(0, weight=1)
 
         # Chat history display
-        history_frame = ttk.LabelFrame(chat_frame, text="Conversation", padding="10")
-        history_frame.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), pady=(0, 10))
+        history_frame = ttk.LabelFrame(right_frame, text="Conversation", padding="5")
+        history_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), pady=(0, 5))
         history_frame.columnconfigure(0, weight=1)
         history_frame.rowconfigure(0, weight=1)
 
-        self.chat_history_text = scrolledtext.ScrolledText(history_frame, width=80, height=20,
+        self.chat_history_text = scrolledtext.ScrolledText(history_frame, width=40, height=15,
                                                           bg='#1e1e1e', fg='#ffffff',
                                                           insertbackground='#ffffff', wrap=tk.WORD)
         self.chat_history_text.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         self.chat_history_text.config(state=tk.DISABLED)
 
         # Message input
-        input_frame = ttk.LabelFrame(chat_frame, text="Your Message", padding="10")
-        input_frame.grid(row=2, column=0, sticky=(tk.W, tk.E), pady=(0, 10))
+        input_frame = ttk.LabelFrame(right_frame, text="Your Message", padding="5")
+        input_frame.grid(row=1, column=0, sticky=(tk.W, tk.E), pady=(0, 5))
         input_frame.columnconfigure(0, weight=1)
 
-        self.chat_input_text = scrolledtext.ScrolledText(input_frame, width=80, height=5,
+        self.chat_input_text = scrolledtext.ScrolledText(input_frame, width=40, height=5,
                                                         bg='#1e1e1e', fg='#ffffff',
                                                         insertbackground='#ffffff', wrap=tk.WORD)
         self.chat_input_text.grid(row=0, column=0, sticky=(tk.W, tk.E))
 
         # Buttons
-        btn_frame = ttk.Frame(chat_frame)
-        btn_frame.grid(row=3, column=0, sticky=tk.E)
+        btn_frame = ttk.Frame(right_frame)
+        btn_frame.grid(row=2, column=0, sticky=tk.E)
 
         self.chat_send_btn = ttk.Button(btn_frame, text="Send Message", command=self.send_chat_message, state=tk.DISABLED)
         self.chat_send_btn.pack(side=tk.LEFT, padx=(0, 5))
 
-        self.chat_apply_btn = ttk.Button(btn_frame, text="Apply Last Response to Section",
+        self.chat_apply_btn = ttk.Button(btn_frame, text="Apply to Section",
                                         command=self.apply_chat_to_section, state=tk.DISABLED)
         self.chat_apply_btn.pack(side=tk.LEFT)
+
+        paned.add(right_frame, minsize=300)
+
+    def update_section_from_editor(self):
+        """Update the current section's content from the editor"""
+        if not self.current_chat_section:
+            messagebox.showwarning("No Section", "No section selected for chat")
+            return
+
+        # Get content from editor
+        editor_content = self.chat_content_editor.get('1.0', tk.END).strip()
+
+        # Confirm update
+        if messagebox.askyesno("Update Section",
+                              f"Update section content from editor?\n\n"
+                              f"Section: {self.current_chat_section.get_full_path()}\n\n"
+                              "This will replace the current content in the document."):
+            # Clear existing content
+            for para in self.current_chat_section.content_paragraphs:
+                para.clear()
+
+            # Add new content
+            if self.current_chat_section.content_paragraphs:
+                self.current_chat_section.content_paragraphs[0].text = editor_content
+            else:
+                # Create new paragraph if none exist
+                self.current_chat_section.paragraph.insert_paragraph_before(editor_content)
+
+            self.log_message(f"✓ Updated section from editor: {self.current_chat_section.get_full_path()}")
+            messagebox.showinfo("Updated", "Section content updated from editor")
 
     def start_section_chat(self):
         """Start a chat session with the selected section"""
@@ -7144,6 +7207,13 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
         self.chat_section_label.set(f"Chatting about: {self.selected_section.get_full_path()}")
         self.chat_send_btn.config(state=tk.NORMAL)
 
+        # Load section content into editor
+        self.chat_content_editor.delete('1.0', tk.END)
+        if self.selected_section.has_content():
+            self.chat_content_editor.insert('1.0', self.selected_section.get_existing_content())
+        else:
+            self.chat_content_editor.insert('1.0', "(No content yet - you can type here or generate via chat)")
+
         # Display chat history
         self.refresh_chat_display()
 
@@ -7151,7 +7221,7 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
         if len(self.section_chat_history[section_hash]) == 0:
             context_msg = f"Started chat for section: {self.selected_section.get_full_path()}\n"
             if self.selected_section.has_content():
-                context_msg += f"\nExisting content:\n{self.selected_section.get_existing_content()}\n"
+                context_msg += f"\nExisting content loaded in editor.\n"
             else:
                 context_msg += "\n(Section currently has no content)\n"
 
