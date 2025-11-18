@@ -1619,7 +1619,7 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
         file_menu.add_command(label="Load Document...", command=self.browse_document, accelerator="Ctrl+O")
         file_menu.add_command(label="Reload Document", command=self.reload_document_wrapper, accelerator="Ctrl+R")
         file_menu.add_separator()
-        file_menu.add_command(label="Export Document...", command=self.export_document_to_file, accelerator="Ctrl+E")
+        file_menu.add_command(label="Save Document As...", command=self.save_as_new_file, accelerator="Ctrl+S")
         file_menu.add_separator()
         file_menu.add_command(label="Load Configuration...", command=self.browse_config_file)
         file_menu.add_command(label="Save Configuration As...", command=self.save_config_as)
@@ -1669,9 +1669,6 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
         tools_menu.add_command(label="Credentials Manager...", command=self.manage_encrypted_credentials_dialog)
         tools_menu.add_separator()
         tools_menu.add_command(label="External RAG Content...", command=self.open_external_content_manager)
-        tools_menu.add_separator()
-        tools_menu.add_command(label="Prompt History...", command=self.show_prompt_history_dialog)
-        tools_menu.add_command(label="Section Chat...", command=self.open_section_chat)
 
         # ===== VIEW MENU =====
         view_menu = tk.Menu(menubar, tearoff=0)
@@ -1694,7 +1691,7 @@ Be specific and actionable in your feedback. Cite specific sentences or phrases 
         # Bind keyboard shortcuts
         self.root.bind('<Control-o>', lambda e: self.browse_document())
         self.root.bind('<Control-r>', lambda e: self.reload_document_wrapper())
-        self.root.bind('<Control-e>', lambda e: self.export_document_to_file())
+        self.root.bind('<Control-s>', lambda e: self.save_as_new_file())
         self.root.bind('<Control-q>', lambda e: self.root.quit())
         self.root.bind('<Control-p>', lambda e: self.open_prompt_manager())
         self.root.bind('<Control-g>', lambda e: self.generate_content())
@@ -1761,7 +1758,7 @@ FILE OPERATIONS
 ─────────────────────────────────────────
 Ctrl+O          Load Document
 Ctrl+R          Reload Document
-Ctrl+E          Export Document
+Ctrl+S          Save Document As
 Ctrl+Q          Exit Application
 
 EDITING & PROMPTS
