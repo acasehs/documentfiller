@@ -1,9 +1,11 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import Layout from './components/Layout'
+import ProtectedRoute from './components/ProtectedRoute'
 import Dashboard from './pages/Dashboard'
 import DocumentEditor from './pages/DocumentEditor'
 import Configuration from './pages/Configuration'
+import Login from './pages/Login'
 import './App.css'
 
 const queryClient = new QueryClient({
@@ -19,13 +21,39 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <Router>
-        <Layout>
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/document/:id" element={<DocumentEditor />} />
-            <Route path="/config" element={<Configuration />} />
-          </Routes>
-        </Layout>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route
+            path="/"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <Dashboard />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/document/:id"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <DocumentEditor />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/config"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <Configuration />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+        </Routes>
       </Router>
     </QueryClientProvider>
   )

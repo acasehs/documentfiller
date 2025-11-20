@@ -1,6 +1,7 @@
 import { ReactNode } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { FileText, Settings, Home } from 'lucide-react'
+import { FileText, Settings, Home, LogOut } from 'lucide-react'
+import { logout } from '../utils/auth'
 
 interface LayoutProps {
   children: ReactNode
@@ -10,6 +11,12 @@ export default function Layout({ children }: LayoutProps) {
   const location = useLocation()
 
   const isActive = (path: string) => location.pathname === path
+
+  const handleLogout = () => {
+    if (confirm('Are you sure you want to logout?')) {
+      logout()
+    }
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800">
@@ -45,6 +52,13 @@ export default function Layout({ children }: LayoutProps) {
                 <Settings className="w-4 h-4" />
                 <span>Configuration</span>
               </Link>
+              <button
+                onClick={handleLogout}
+                className="flex items-center space-x-2 px-4 py-2 rounded-lg text-red-400 hover:bg-slate-800 transition-colors"
+              >
+                <LogOut className="w-4 h-4" />
+                <span>Logout</span>
+              </button>
             </nav>
           </div>
         </div>
@@ -57,7 +71,7 @@ export default function Layout({ children }: LayoutProps) {
 
       {/* Footer */}
       <footer className="mt-auto py-6 text-center text-slate-400 text-sm">
-        <p>DocumentFiller v1.0 - DoD Cybersecurity Documentation Tool</p>
+        <p>DocumentFiller v2.0 - DoD Cybersecurity Documentation Tool</p>
       </footer>
     </div>
   )
