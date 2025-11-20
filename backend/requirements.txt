@@ -1,0 +1,32 @@
+# FastAPI Backend Requirements
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+python-multipart==0.0.6
+pydantic==2.5.0
+pydantic-settings==2.1.0
+
+# Document processing
+python-docx==1.1.0
+
+# Database
+sqlalchemy==2.0.23
+aiosqlite==0.19.0
+
+# Authentication & Security
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+cryptography==41.0.7
+
+# HTTP client
+httpx==0.25.2
+aiohttp==3.9.1
+
+# NLP and text analysis (optional modules)
+textstat==0.7.3
+nltk==3.8.1
+tiktoken==0.5.2
+scikit-learn==1.3.2
+numpy==1.26.2
+
+# Utilities
+python-dotenv==1.0.0
