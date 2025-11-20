@@ -1,0 +1,251 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: documentfiller
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: documentfiller-config
+  namespace: documentfiller
+data:
+  BACKEND_PORT: "8000"
+  BACKEND_HOST: "0.0.0.0"
+  DATABASE_URL: "postgresql://documentfiller:password@postgres:5432/documentfiller"
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: documentfiller-secrets
+  namespace: documentfiller
+type: Opaque
+stringData:
+  SECRET_KEY: "change-this-to-a-random-secret-key"
+  POSTGRES_PASSWORD: "change-this-password"
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: documentfiller-backend
+  namespace: documentfiller
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: documentfiller-backend
+  template:
+    metadata:
+      labels:
+        app: documentfiller-backend
+    spec:
+      containers:
+      - name: backend
+        image: documentfiller-backend:latest
+        ports:
+        - containerPort: 8000
+        envFrom:
+        - configMapRef:
+            name: documentfiller-config
+        - secretRef:
+            name: documentfiller-secrets
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: documentfiller-frontend
+  namespace: documentfiller
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: documentfiller-frontend
+  template:
+    metadata:
+      labels:
+        app: documentfiller-frontend
+    spec:
+      containers:
+      - name: frontend
+        image: documentfiller-frontend:latest
+        ports:
+        - containerPort: 80
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "200m"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: documentfiller-backend
+  namespace: documentfiller
+spec:
+  selector:
+    app: documentfiller-backend
+  ports:
+  - protocol: TCP
+    port: 8000
+    targetPort: 8000
+  type: ClusterIP
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: documentfiller-frontend
+  namespace: documentfiller
+spec:
+  selector:
+    app: documentfiller-frontend
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 80
+  type: LoadBalancer
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: documentfiller-ingress
+  namespace: documentfiller
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - documentfiller.example.com
+    secretName: documentfiller-tls
+  rules:
+  - host: documentfiller.example.com
+    http:
+      paths:
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: documentfiller-backend
+            port:
+              number: 8000
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: documentfiller-frontend
+            port:
+              number: 80
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: documentfiller
+spec:
+  serviceName: postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:15
+        ports:
+        - containerPort: 5432
+        env:
+        - name: POSTGRES_DB
+          value: documentfiller
+        - name: POSTGRES_USER
+          value: documentfiller
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: documentfiller-secrets
+              key: POSTGRES_PASSWORD
+        volumeMounts:
+        - name: postgres-storage
+          mountPath: /var/lib/postgresql/data
+  volumeClaimTemplates:
+  - metadata:
+      name: postgres-storage
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 10Gi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: documentfiller
+spec:
+  selector:
+    app: postgres
+  ports:
+  - protocol: TCP
+    port: 5432
+    targetPort: 5432
+  clusterIP: None
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: documentfiller-backend-hpa
+  namespace: documentfiller
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: documentfiller-backend
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80

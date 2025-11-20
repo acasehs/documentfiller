@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard'
 import DocumentEditor from './pages/DocumentEditor'
 import Configuration from './pages/Configuration'
 import ModelComparison from './pages/ModelComparison'
+import PromptTemplates from './pages/PromptTemplates'
 import Login from './pages/Login'
 import './App.css'
 
@@ -60,6 +61,16 @@ function App() {
               <ProtectedRoute>
                 <Layout>
                   <ModelComparison />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/templates"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <PromptTemplates />
                 </Layout>
               </ProtectedRoute>
             }
