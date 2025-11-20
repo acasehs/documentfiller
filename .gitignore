@@ -51,6 +51,7 @@ config_credentials.enc
 openwebui_config.json
 config_credentials.enc
 *.enc
+
 .env
 
 # Node.js
