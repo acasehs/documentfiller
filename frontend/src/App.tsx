@@ -5,6 +5,7 @@ import ProtectedRoute from './components/ProtectedRoute'
 import Dashboard from './pages/Dashboard'
 import DocumentEditor from './pages/DocumentEditor'
 import Configuration from './pages/Configuration'
+import ModelComparison from './pages/ModelComparison'
 import Login from './pages/Login'
 import './App.css'
 
@@ -49,6 +50,16 @@ function App() {
               <ProtectedRoute>
                 <Layout>
                   <Configuration />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/compare"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <ModelComparison />
                 </Layout>
               </ProtectedRoute>
             }
