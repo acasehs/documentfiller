@@ -33,11 +33,12 @@ from batch_processor import batch_processor, BatchStatus
 # Import existing modules
 from content_processor import ContentProcessor
 from document_reviewer import DocumentReviewer
+from analytics import AnalyticsService
 
 app = FastAPI(
     title="DocumentFiller API",
-    description="AI-powered document generation and review system with authentication",
-    version="2.0.0"
+    description="AI-powered document generation and review system with authentication and analytics",
+    version="3.1.0"
 )
 
 # Initialize database
@@ -488,6 +489,124 @@ async def get_available_models(current_user: User = Depends(get_current_active_u
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch models: {str(e)}")
+
+# ==================== Analytics Endpoints (v3.1) ====================
+
+@app.get("/api/analytics/user/stats")
+async def get_user_analytics_stats(
+    days: int = 30,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Get comprehensive user analytics statistics"""
+    try:
+        analytics = AnalyticsService(db)
+        stats = analytics.get_user_stats(current_user.id, days)
+        return stats
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch analytics: {str(e)}")
+
+@app.get("/api/analytics/user/timeline")
+async def get_user_activity_timeline(
+    days: int = 30,
+    granularity: str = 'day',
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Get user activity timeline"""
+    try:
+        analytics = AnalyticsService(db)
+        timeline = analytics.get_user_activity_timeline(current_user.id, days, granularity)
+        return {"timeline": timeline}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch timeline: {str(e)}")
+
+@app.get("/api/analytics/user/documents")
+async def get_user_document_breakdown(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Get user document breakdown"""
+    try:
+        analytics = AnalyticsService(db)
+        breakdown = analytics.get_user_document_breakdown(current_user.id)
+        return breakdown
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch breakdown: {str(e)}")
+
+@app.get("/api/analytics/system/stats")
+async def get_system_analytics_stats(
+    days: int = 30,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Get system-wide analytics statistics (admin only)"""
+    try:
+        # Note: In production, add admin role check here
+        analytics = AnalyticsService(db)
+        stats = analytics.get_system_stats(days)
+        return stats
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch system stats: {str(e)}")
+
+@app.get("/api/analytics/system/top-users")
+async def get_top_users(
+    metric: str = 'generations',
+    limit: int = 10,
+    days: int = 30,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Get top users by metric (admin only)"""
+    try:
+        # Note: In production, add admin role check here
+        analytics = AnalyticsService(db)
+        top_users = analytics.get_top_users(metric, limit, days)
+        return {"top_users": top_users}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch top users: {str(e)}")
+
+@app.get("/api/analytics/performance")
+async def get_performance_metrics(
+    days: int = 7,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Get system performance metrics"""
+    try:
+        analytics = AnalyticsService(db)
+        metrics = analytics.get_performance_metrics(days)
+        return metrics
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch performance metrics: {str(e)}")
+
+@app.get("/api/analytics/quality")
+async def get_quality_trends(
+    days: int = 30,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Get document quality trends"""
+    try:
+        analytics = AnalyticsService(db)
+        trends = analytics.get_quality_trends(days)
+        return trends
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch quality trends: {str(e)}")
+
+@app.get("/api/analytics/export")
+async def export_user_analytics(
+    format: str = 'json',
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Export user analytics data"""
+    try:
+        analytics = AnalyticsService(db)
+        data = analytics.export_user_data(current_user.id, format)
+        return data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to export data: {str(e)}")
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)

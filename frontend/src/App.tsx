@@ -7,6 +7,7 @@ import DocumentEditor from './pages/DocumentEditor'
 import Configuration from './pages/Configuration'
 import ModelComparison from './pages/ModelComparison'
 import PromptTemplates from './pages/PromptTemplates'
+import Analytics from './pages/Analytics'
 import Login from './pages/Login'
 import './App.css'
 
@@ -71,6 +72,16 @@ function App() {
               <ProtectedRoute>
                 <Layout>
                   <PromptTemplates />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/analytics"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <Analytics />
                 </Layout>
               </ProtectedRoute>
             }
