@@ -81,3 +81,17 @@ logs/
 
 # Development scripts
 start-dev.sh
+# Web Application
+backend/.env
+backend/uploads/
+backend/data/
+backend/**/__pycache__/
+
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+frontend/.env.local
+
+# Docker
+.env
+uploads/
