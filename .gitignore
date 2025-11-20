@@ -52,6 +52,35 @@ openwebui_config.json
 config_credentials.enc
 *.enc
 
+.env
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Build outputs
+dist/
+build/
+frontend/dist/
+frontend/build/
+
+# Uploaded documents
+uploads/
+*.docx
+*.doc
+
+# Logs
+logs/
+*.log
+
+# Docker
+.docker/
+
+# Development scripts
+start-dev.sh
 # Web Application
 backend/.env
 backend/uploads/

@@ -1,3 +1,10 @@
+FROM node:20-alpine
+
+# Set working directory
+WORKDIR /app
+
+# Copy package files
+COPY package.json package-lock.json* ./
 # Frontend Build Stage
 FROM node:20-alpine AS build
 
@@ -9,6 +16,14 @@ COPY package*.json ./
 # Install dependencies
 RUN npm install
 
+# Copy application code
+COPY . .
+
+# Expose port
+EXPOSE 3000
+
+# Start development server
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
 # Copy source code
 COPY . .
 
