@@ -51,3 +51,18 @@ config_credentials.enc
 openwebui_config.json
 config_credentials.enc
 *.enc
+
+# Web Application
+backend/.env
+backend/uploads/
+backend/data/
+backend/**/__pycache__/
+
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+frontend/.env.local
+
+# Docker
+.env
+uploads/

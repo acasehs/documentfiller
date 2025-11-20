@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: documentfiller-backend
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    environment:
+      - API_HOST=0.0.0.0
+      - API_PORT=8000
+      - OPENWEBUI_BASE_URL=${OPENWEBUI_BASE_URL:-http://172.16.27.122:3000}
+      - OPENWEBUI_API_KEY=${OPENWEBUI_API_KEY:-}
+      - CORS_ORIGINS=http://localhost:${FRONTEND_PORT:-5173},http://127.0.0.1:${FRONTEND_PORT:-5173}
+    volumes:
+      - ./backend:/app
+      - uploads:/app/uploads
+      - backend-data:/app/data
+    restart: unless-stopped
+    networks:
+      - documentfiller-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_URL=http://localhost:${BACKEND_PORT:-8000}
+    container_name: documentfiller-frontend
+    ports:
+      - "${FRONTEND_PORT:-5173}:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - documentfiller-network
+
+volumes:
+  uploads:
+    driver: local
+  backend-data:
+    driver: local
+
+networks:
+  documentfiller-network:
+    driver: bridge
