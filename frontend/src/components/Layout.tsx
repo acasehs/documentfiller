@@ -1,6 +1,6 @@
 import { ReactNode } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { FileText, Settings, Home, LogOut } from 'lucide-react'
+import { FileText, Settings, Home, LogOut, GitCompare } from 'lucide-react'
 import { logout } from '../utils/auth'
 
 interface LayoutProps {
@@ -40,6 +40,17 @@ export default function Layout({ children }: LayoutProps) {
               >
                 <Home className="w-4 h-4" />
                 <span>Dashboard</span>
+              </Link>
+              <Link
+                to="/compare"
+                className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${
+                  isActive('/compare')
+                    ? 'bg-blue-600 text-white'
+                    : 'text-slate-300 hover:bg-slate-800'
+                }`}
+              >
+                <GitCompare className="w-4 h-4" />
+                <span>Compare</span>
               </Link>
               <Link
                 to="/config"
