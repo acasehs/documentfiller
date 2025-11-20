@@ -1,6 +1,6 @@
 import { ReactNode } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { FileText, Settings, Home, LogOut, GitCompare } from 'lucide-react'
+import { FileText, Settings, Home, LogOut, GitCompare, BookTemplate } from 'lucide-react'
 import { logout } from '../utils/auth'
 
 interface LayoutProps {
@@ -53,6 +53,17 @@ export default function Layout({ children }: LayoutProps) {
                 <span>Compare</span>
               </Link>
               <Link
+                to="/templates"
+                className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${
+                  isActive('/templates')
+                    ? 'bg-blue-600 text-white'
+                    : 'text-slate-300 hover:bg-slate-800'
+                }`}
+              >
+                <BookTemplate className="w-4 h-4" />
+                <span>Templates</span>
+              </Link>
+              <Link
                 to="/config"
                 className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${
                   isActive('/config')
@@ -82,7 +93,7 @@ export default function Layout({ children }: LayoutProps) {
 
       {/* Footer */}
       <footer className="mt-auto py-6 text-center text-slate-400 text-sm">
-        <p>DocumentFiller v2.0 - DoD Cybersecurity Documentation Tool</p>
+        <p>DocumentFiller v3.0 - DoD Cybersecurity Documentation Tool</p>
       </footer>
     </div>
   )
