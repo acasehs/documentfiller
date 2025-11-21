@@ -11,13 +11,32 @@ This is the web version of the Document Filler desktop application, featuring:
 - **OpenWebUI Integration**: AI-powered content generation
 - **Document Analysis**: Technical review, tense checking, readability metrics
 
-## Quick Start with Docker Compose
+## Quick Start
 
-### Prerequisites
+### Windows Users (Recommended)
+
+**Automated Installation - Just double-click!**
+
+1. Ensure Docker Desktop is running
+2. Double-click `install.bat` in the project folder
+3. Follow the prompts (installer auto-detects available ports)
+4. Application opens automatically in your browser!
+
+See **[INSTALLATION_WINDOWS.md](INSTALLATION_WINDOWS.md)** for detailed Windows installation guide.
+
+The installer automatically:
+- ✅ Detects and resolves port conflicts
+- ✅ Configures all environment variables
+- ✅ Builds and starts containers
+- ✅ Verifies everything is working
+
+### Linux/Mac or Manual Installation
+
+#### Prerequisites
 - Docker Desktop (Windows/Mac) or Docker + Docker Compose (Linux)
 - OpenWebUI instance accessible from your machine
 
-### 1. Configure Ports (Optional)
+#### 1. Configure Ports (Optional)
 
 Copy the example environment file:
 ```bash
@@ -34,7 +53,7 @@ OPENWEBUI_BASE_URL=http://172.16.27.122:3000
 OPENWEBUI_API_KEY=your-api-key-here
 ```
 
-### 2. Start the Application
+#### 2. Start the Application
 
 ```bash
 docker-compose up -d
@@ -45,13 +64,13 @@ This will:
 - Start the services with your configured ports
 - Create persistent volumes for uploads and data
 
-### 3. Access the Application
+#### 3. Access the Application
 
 - **Frontend**: http://localhost:5173 (or your custom FRONTEND_PORT)
 - **Backend API**: http://localhost:8000 (or your custom BACKEND_PORT)
 - **API Documentation**: http://localhost:8000/docs
 
-### 4. Stop the Application
+#### 4. Stop the Application
 
 ```bash
 docker-compose down
