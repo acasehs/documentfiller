@@ -10,6 +10,11 @@ from pathlib import Path
 
 from app.api.routes import documents, content, review, config
 from app.utils.config import settings
+from app.utils.security import (
+    RateLimitMiddleware,
+    SecurityHeadersMiddleware,
+    RequestValidationMiddleware,
+)
 
 # Ensure upload directory exists
 UPLOAD_DIR = Path(settings.UPLOAD_DIR)
@@ -36,6 +41,11 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan
 )
+
+# Security middlewares (order matters!)
+app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(RateLimitMiddleware)
+app.add_middleware(RequestValidationMiddleware)
 
 # CORS middleware
 app.add_middleware(

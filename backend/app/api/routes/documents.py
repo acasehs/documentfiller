@@ -13,6 +13,7 @@ from app.models.document import (
 )
 from app.services.document_service import DocumentService
 from app.utils.config import settings
+from app.utils.validation import InputValidator, ContentSanitizer
 
 router = APIRouter()
 document_service = DocumentService()
@@ -26,8 +27,14 @@ async def upload_document(file: UploadFile = File(...)):
     Returns:
         Document structure with sections, headings, and existing content
     """
+    # Validate filename
+    try:
+        safe_filename = InputValidator.sanitize_filename(file.filename)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
     # Validate file type
-    if not file.filename.endswith('.docx'):
+    if not safe_filename.endswith('.docx'):
         raise HTTPException(
             status_code=400,
             detail="Only .docx files are supported"
@@ -36,8 +43,8 @@ async def upload_document(file: UploadFile = File(...)):
     # Generate unique document ID
     document_id = str(uuid.uuid4())
 
-    # Save uploaded file
-    upload_path = Path(settings.UPLOAD_DIR) / f"{document_id}_{file.filename}"
+    # Save uploaded file with sanitized filename
+    upload_path = Path(settings.UPLOAD_DIR) / f"{document_id}_{safe_filename}"
 
     try:
         with upload_path.open("wb") as buffer:
@@ -48,13 +55,20 @@ async def upload_document(file: UploadFile = File(...)):
             detail=f"Failed to save uploaded file: {str(e)}"
         )
 
+    # Validate uploaded file
+    try:
+        InputValidator.validate_file_upload(str(upload_path), ['.docx'])
+    except ValueError as e:
+        upload_path.unlink(missing_ok=True)
+        raise HTTPException(status_code=400, detail=str(e))
+
     # Parse document structure
     try:
         structure = await document_service.parse_document(str(upload_path), document_id)
 
         return DocumentUploadResponse(
             document_id=document_id,
-            filename=file.filename,
+            filename=safe_filename,
             size=upload_path.stat().st_size,
             structure=structure
         )
